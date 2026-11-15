@@ -18,3 +18,5 @@ V30LAUNCH||gpus=0;1;4;5;6;7
 --E--
 
 --E--
+V30RESTART||tick 0  | --E-- | 
+--E--
