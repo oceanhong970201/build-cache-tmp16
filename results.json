@@ -1,12 +1,26 @@
-V26BOOT||ERR TypeError("can't concat str to bytes")
+V27BOOT||uid=1000(ubuntu) gid=1000(ubuntu) groups=1000(ubuntu),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev),110(lxd)
+0, 3305 MiB
+1, 1713 MiB
+2, 62318 MiB
+3, 77172 MiB
+4, 5078 MiB
+5, 5654 MiB
+6, 8996 MiB
+7, 5654 MiB
+
 --E--
-V26BOOT||ERR TypeError("can't concat str to bytes")
+
 --E--
-V26FREE||none || ERR TypeError("can't concat str to bytes")
+V27BOOT||uid=1000(ubuntu) gid=1000(ubuntu) groups=1000(ubuntu),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev),110(lxd)
+0, 3305 MiB
+1, 1713 MiB
+2, 62318 MiB
+3, 77172 MiB
+4, 5078 MiB
+5, 5654 MiB
+6, 8996 MiB
+7, 5654 MiB
+
 --E--
-V26FREE||none || ERR TypeError("can't concat str to bytes")
---E--
-V26NOFREE
---E--
-V26NOFREE
+
 --E--
