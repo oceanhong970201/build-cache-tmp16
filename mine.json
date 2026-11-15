@@ -34,3 +34,51 @@ s.tar.gz
 --E--
 
 --E--
+V24BOOT||LESSOPEN=| /usr/bin/lesspipe %s
+CONDA_PROMPT_MODIFIER=(llmM) 
+NCCL_SOCKET_IFNAME=ib0,ib1,ib2,ib3
+USER=ubuntu
+SSH_CLIENT=111.200.184.8 53107 22
+TRANSFORMERS_VERBOSITY=info
+XDG_SESSION_TYPE=tty
+SHLVL=0
+LD_LIBRARY_PATH=/usr/local/cuda/lib64:
+MOTD_SHOWN=pam
+HOME=/home/ubuntu
+CONDA_SHLVL=2
+OLDPWD=
+SSH_TTY=/dev/pts/1
+DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
+_CE_M=
+PYTHONNOUSERSITE=1
+LOGNAME=ubuntu
+_=/usr/bin/nohup
+XDG_SESSION_CLASS=user
+algo.log
+env.txt
+fg.log
+h2.log
+h3.log
+h4.log
+h5.log
+h6.log
+help.log
+miner.log
+SRBMiner-Multi-3-8-8
+s.tar.gz
+
+--E--
+
+--E--
+V24GPU||0, 3305 MiB, 0 %
+1, 1713 MiB, 0 %
+2, 62318 MiB, 0 %
+3, 77172 MiB, 0 %
+4, 5078 MiB, 0 %
+5, 5654 MiB, 0 %
+6, 8996 MiB, 0 %
+7, 5654 MiB, 0 %
+
+--E--
+
+--E--
