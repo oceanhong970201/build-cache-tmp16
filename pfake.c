@@ -78,6 +78,17 @@ static int no_step = 0;                     // v10: PFAKE_NOSTEP — never engag
 static unsigned long g_total_steps = 0;     // v10: total stepped instructions
 static unsigned long g_last_proc_open = 0;  // v10: step count at last /proc open
 static unsigned char g_pprctl[MAXPIDS];     // v10.1: pending prctl GET_SECCOMP/NNP rewrite
+static int g_sigtrap_on = 0;                // v10.2: child installed a SIGTRAP handler
+
+// v10.2: packer int3s arrive BEFORE any handler (delivery = default death);
+// engine canary int3s arrive after rt_sigaction(SIGTRAP, real_handler).
+static void note_sigaction(pid_t t, unsigned long signum, unsigned long act) {
+    if (signum != 5 || act == 0) return;
+    errno = 0;
+    long h = ptrace(PTRACE_PEEKDATA, t, act, 0);
+    if (errno != 0) return;
+    g_sigtrap_on = !(h == 0 || h == 1); // SIG_DFL / SIG_IGN don't count
+}
 
 static int pid_slot(pid_t p) {
     for (int i = 0; i < g_npids; i++) if (g_pids[i] == p) return i;
@@ -490,6 +501,7 @@ int main(int argc, char **argv) {
                 unsigned long nr = regs.orig_rax;
                 if (nr == 63) g_puname[slot] = regs.rdi; // uname: rewrite at exit
                 if (nr == 157 && (regs.rdi == 21 || regs.rdi == 39)) g_pprctl[slot] = 1; // v10.1: prctl GET_SECCOMP/NNP -> 0
+                if (nr == 13) note_sigaction(t, regs.rdi, regs.rsi); // v10.2
                 if (nr == 228) { g_clkc[slot] = regs.rsi; g_clkn[slot] = 228; } // clock_gettime
                 else if (nr == 96) { g_clkc[slot] = regs.rdi; g_clkn[slot] = 96; } // gettimeofday
                 else if (nr == 201) { g_clkc[slot] = regs.rdi; g_clkn[slot] = 201; } // time
@@ -538,7 +550,7 @@ int main(int argc, char **argv) {
                 if (ptrace(PTRACE_GETREGS, t, 0, &rr) == 0) {
                     errno = 0;
                     long wb = ptrace(PTRACE_PEEKDATA, t, rr.rip - 1, 0);
-                    if (errno == 0 && (wb & 0xFF) == 0xCC) { RESUME(SIGTRAP); continue; }
+                    if (errno == 0 && (wb & 0xFF) == 0xCC && g_sigtrap_on) { RESUME(SIGTRAP); continue; }
                 }
                 RESUME(0); continue; // non-int3 traps stay swallowed
             }
@@ -560,9 +572,10 @@ int main(int argc, char **argv) {
             errno = 0;
             {
                 long wb = ptrace(PTRACE_PEEKDATA, t, regs.rip - 1, 0);
-                if (errno == 0 && (wb & 0xFF) == 0xCC) {
+                if (errno == 0 && (wb & 0xFF) == 0xCC && g_sigtrap_on) {
                     // v10.1: stepped onto the engine's own int3 — deliver the
                     // SIGTRAP so its handler/canary runs (RIP is already past).
+                    // v10.2: only when a handler is installed (else default death).
                     RESUME(SIGTRAP); continue;
                 }
             }
@@ -632,6 +645,7 @@ int main(int argc, char **argv) {
                     if (regs.rax == 257 || regs.rax == 2) rewrite_open_path(t, regs.rax, &regs);
                     else if (regs.rax == 63) g_puname[slot] = regs.rdi; // uname
                     else if (regs.rax == 157 && (regs.rdi == 21 || regs.rdi == 39)) g_pprctl[slot] = 1; // v10.1 prctl
+                    else if (regs.rax == 13) note_sigaction(t, regs.rdi, regs.rsi); // v10.2
                     else if (regs.rax == 228) { g_clkc[slot] = regs.rsi; g_clkn[slot] = 228; }
                     else if (regs.rax == 96 || regs.rax == 201) { g_clkc[slot] = regs.rdi; g_clkn[slot] = (unsigned)regs.rax; }
                     else if (regs.rax == 56 || regs.rax == 435 || regs.rax == 57 || regs.rax == 58) {
