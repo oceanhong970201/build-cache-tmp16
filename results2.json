@@ -12,3 +12,5 @@ V37BOOT||uid=1000(ubuntu) gid=1000(ubuntu) groups=1000(ubuntu),4(adm),24(cdrom),
 --E--
 
 --E--
+V37FREE||0,1,4,5,6,7 || 0, 13756 MiB | 1, 12164 MiB | 2, 72771 MiB | 3, 78013 MiB | 4, 15529 MiB | 5, 16105 MiB | 6, 19449 MiB | 7, 16105 MiB |  | --E-- | 
+--E--
