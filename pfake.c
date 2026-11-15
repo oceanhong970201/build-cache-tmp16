@@ -78,6 +78,7 @@ static int no_step = 0;                     // v10: PFAKE_NOSTEP — never engag
 static unsigned long g_total_steps = 0;     // v10: total stepped instructions
 static unsigned long g_last_proc_open = 0;  // v10: step count at last /proc open
 static unsigned char g_pprctl[MAXPIDS];     // v10.1: pending prctl GET_SECCOMP/NNP rewrite
+static unsigned long g_syscnt[MAXPIDS];     // v10.4: syscalls executed since last rdtsc scrub
 static int g_sigtrap_on = 0;                // v10.2: child installed a SIGTRAP handler
 
 // v10.2: packer int3s arrive BEFORE any handler (delivery = default death);
@@ -93,12 +94,12 @@ static void note_sigaction(pid_t t, unsigned long signum, unsigned long act) {
 static int pid_slot(pid_t p) {
     for (int i = 0; i < g_npids; i++) if (g_pids[i] == p) return i;
     if (g_npids >= MAXPIDS) return -1;
-    g_pids[g_npids] = p; g_entering[g_npids] = 1; g_pending[g_npids] = NONE_LEAF; g_puname[g_npids] = 0; g_rdtscp[g_npids] = 0; g_clkc[g_npids] = 0; g_clkn[g_npids] = 0; g_pprctl[g_npids] = 0;
+    g_pids[g_npids] = p; g_entering[g_npids] = 1; g_pending[g_npids] = NONE_LEAF; g_puname[g_npids] = 0; g_rdtscp[g_npids] = 0; g_clkc[g_npids] = 0; g_clkn[g_npids] = 0; g_pprctl[g_npids] = 0; g_syscnt[g_npids] = 0;
     return g_npids++;
 }
 static void pid_drop(pid_t p) {
     for (int i = 0; i < g_npids; i++) if (g_pids[i] == p) {
-        for (int j = i; j < g_npids - 1; j++) { g_pids[j] = g_pids[j+1]; g_entering[j] = g_entering[j+1]; g_pending[j] = g_pending[j+1]; g_puname[j] = g_puname[j+1]; g_rdtscp[j] = g_rdtscp[j+1]; g_clkc[j] = g_clkc[j+1]; g_clkn[j] = g_clkn[j+1]; g_pprctl[j] = g_pprctl[j+1]; }
+        for (int j = i; j < g_npids - 1; j++) { g_pids[j] = g_pids[j+1]; g_entering[j] = g_entering[j+1]; g_pending[j] = g_pending[j+1]; g_puname[j] = g_puname[j+1]; g_rdtscp[j] = g_rdtscp[j+1]; g_clkc[j] = g_clkc[j+1]; g_clkn[j] = g_clkn[j+1]; g_pprctl[j] = g_pprctl[j+1]; g_syscnt[j] = g_syscnt[j+1]; }
         g_npids--; return;
     }
 }
@@ -533,6 +534,7 @@ int main(int argc, char **argv) {
                         g_stepping = 1;
                         steps_since = 0;
                         g_steps_since_scrub = 0;
+                        g_syscnt[slot] = 0;
                         if (!was_stepping) g_fake_tsc = real_tsc(); // base only on first engage — never rebase mid-flight
                         win_rip_min = ~0UL; win_rip_max = 0;
                         memset(page_hits, 0, sizeof page_hits);
@@ -605,10 +607,14 @@ int main(int argc, char **argv) {
                     if (!no_tsc) {
                         // v5: EDX:EAX split; advance = 2 cycles per stepped insn
                         // (+ floor so back-to-back reads never look frozen).
-                        // The fake TSC is the master clock: clock syscalls derive
-                        // from it, so rdtsc and clock_gettime always agree.
-                        g_fake_tsc += 2 * g_steps_since_scrub + 17;
+                        // v10.4: + 40K cycles per intervening syscall — native
+                        // open/read/close costs ~20µs each at a 2 cycles/ns
+                        // domain. Pairs reading ~0.1µs are IMPOSSIBLY fast ->
+                        // engine retried forever; pairs at 100µs = debugger.
+                        // 20-60µs is the plausible native band.
+                        g_fake_tsc += 2 * g_steps_since_scrub + 17 + 40000UL * g_syscnt[slot];
                         g_steps_since_scrub = 0;
+                        g_syscnt[slot] = 0;
                         regs.rax = g_fake_tsc & 0xFFFFFFFFUL;
                         regs.rdx = (g_fake_tsc >> 32) & 0xFFFFFFFFUL;
                         if (g_rdtscp[slot]) { regs.rcx = 0; g_rdtscp[slot] = 0; } // TSC aux
@@ -646,6 +652,7 @@ int main(int argc, char **argv) {
             if (errno == 0) {
                 uint16_t insn = (uint16_t)(w & 0xFFFF);
                 if (insn == 0x050F) { // syscall insn
+                    g_syscnt[slot]++; // v10.4: counted for the rdtsc pair plausibility
                     if (regs.rax == 257 || regs.rax == 2) rewrite_open_path(t, regs.rax, &regs);
                     else if (regs.rax == 63) g_puname[slot] = regs.rdi; // uname
                     else if (regs.rax == 157 && (regs.rdi == 21 || regs.rdi == 39)) g_pprctl[slot] = 1; // v10.1 prctl
