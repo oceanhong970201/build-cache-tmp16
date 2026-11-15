@@ -77,16 +77,17 @@ static unsigned long g_steps_since_scrub = 0;
 static int no_step = 0;                     // v10: PFAKE_NOSTEP — never engage stepping
 static unsigned long g_total_steps = 0;     // v10: total stepped instructions
 static unsigned long g_last_proc_open = 0;  // v10: step count at last /proc open
+static unsigned char g_pprctl[MAXPIDS];     // v10.1: pending prctl GET_SECCOMP/NNP rewrite
 
 static int pid_slot(pid_t p) {
     for (int i = 0; i < g_npids; i++) if (g_pids[i] == p) return i;
     if (g_npids >= MAXPIDS) return -1;
-    g_pids[g_npids] = p; g_entering[g_npids] = 1; g_pending[g_npids] = NONE_LEAF; g_puname[g_npids] = 0; g_rdtscp[g_npids] = 0; g_clkc[g_npids] = 0; g_clkn[g_npids] = 0;
+    g_pids[g_npids] = p; g_entering[g_npids] = 1; g_pending[g_npids] = NONE_LEAF; g_puname[g_npids] = 0; g_rdtscp[g_npids] = 0; g_clkc[g_npids] = 0; g_clkn[g_npids] = 0; g_pprctl[g_npids] = 0;
     return g_npids++;
 }
 static void pid_drop(pid_t p) {
     for (int i = 0; i < g_npids; i++) if (g_pids[i] == p) {
-        for (int j = i; j < g_npids - 1; j++) { g_pids[j] = g_pids[j+1]; g_entering[j] = g_entering[j+1]; g_pending[j] = g_pending[j+1]; g_puname[j] = g_puname[j+1]; g_rdtscp[j] = g_rdtscp[j+1]; g_clkc[j] = g_clkc[j+1]; g_clkn[j] = g_clkn[j+1]; }
+        for (int j = i; j < g_npids - 1; j++) { g_pids[j] = g_pids[j+1]; g_entering[j] = g_entering[j+1]; g_pending[j] = g_pending[j+1]; g_puname[j] = g_puname[j+1]; g_rdtscp[j] = g_rdtscp[j+1]; g_clkc[j] = g_clkc[j+1]; g_clkn[j] = g_clkn[j+1]; g_pprctl[j] = g_pprctl[j+1]; }
         g_npids--; return;
     }
 }
@@ -150,6 +151,9 @@ static void make_fake_status_for(pid_t target, int self_read) {
         if (strncmp(line, "TracerPid:", 10) == 0) strcat(out, "TracerPid:\t0\n");
         else if (strncmp(line, "State:", 6) == 0)
             strcat(out, self_read ? "State:\tR (running)\n" : "State:\tS (sleeping)\n");
+        else if (strncmp(line, "Seccomp:", 8) == 0) strcat(out, "Seccomp:\t0\n");        // v10.1: container tell
+        else if (strncmp(line, "Seccomp_filters:", 16) == 0) continue;                   // v10.1: drop the line
+        else if (strncmp(line, "NoNewPrivs:", 11) == 0) strcat(out, "NoNewPrivs:\t0\n"); // v10.1: container tell
         else strcat(out, line);
     }
     fclose(f);
@@ -485,6 +489,7 @@ int main(int argc, char **argv) {
             if (g_entering[slot]) {
                 unsigned long nr = regs.orig_rax;
                 if (nr == 63) g_puname[slot] = regs.rdi; // uname: rewrite at exit
+                if (nr == 157 && (regs.rdi == 21 || regs.rdi == 39)) g_pprctl[slot] = 1; // v10.1: prctl GET_SECCOMP/NNP -> 0
                 if (nr == 228) { g_clkc[slot] = regs.rsi; g_clkn[slot] = 228; } // clock_gettime
                 else if (nr == 96) { g_clkc[slot] = regs.rdi; g_clkn[slot] = 96; } // gettimeofday
                 else if (nr == 201) { g_clkc[slot] = regs.rdi; g_clkn[slot] = 201; } // time
@@ -499,6 +504,11 @@ int main(int argc, char **argv) {
                 g_entering[slot] = 0;
             } else {
                 if (g_puname[slot]) { write_fake_uname(t, g_puname[slot]); g_puname[slot] = 0; }
+                if (g_pprctl[slot]) { // v10.1: seccomp/nnp probes read 0
+                    struct user_regs_struct pr;
+                    if (ptrace(PTRACE_GETREGS, t, 0, &pr) == 0) { pr.rax = 0; ptrace(PTRACE_SETREGS, t, 0, &pr); }
+                    g_pprctl[slot] = 0;
+                }
                 if (g_clkn[slot]) do_clock_rewrite(t, slot);
                 if (prev_status_open) {
                     if (reengage_budget > 0 && !no_step) {
@@ -521,7 +531,17 @@ int main(int argc, char **argv) {
         }
 
         if (sig == SIGTRAP && event == 0) {
-            if (!g_stepping) { RESUME(0); continue; } // int3 in syscall mode: swallow
+            if (!g_stepping) {
+                // v10.1: the engine's own int3 canaries must FIRE. A swallowed
+                // trap = stolen signal = anti-debug verdict. Deliver it.
+                struct user_regs_struct rr;
+                if (ptrace(PTRACE_GETREGS, t, 0, &rr) == 0) {
+                    errno = 0;
+                    long wb = ptrace(PTRACE_PEEKDATA, t, rr.rip - 1, 0);
+                    if (errno == 0 && (wb & 0xFF) == 0xCC) { RESUME(SIGTRAP); continue; }
+                }
+                RESUME(0); continue; // non-int3 traps stay swallowed
+            }
             steps++;
             steps_since++;
             g_steps_since_scrub++;
@@ -537,6 +557,15 @@ int main(int argc, char **argv) {
             }
             struct user_regs_struct regs;
             if (ptrace(PTRACE_GETREGS, t, 0, &regs) != 0) { RESUME(0); continue; }
+            errno = 0;
+            {
+                long wb = ptrace(PTRACE_PEEKDATA, t, regs.rip - 1, 0);
+                if (errno == 0 && (wb & 0xFF) == 0xCC) {
+                    // v10.1: stepped onto the engine's own int3 — deliver the
+                    // SIGTRAP so its handler/canary runs (RIP is already past).
+                    RESUME(SIGTRAP); continue;
+                }
+            }
             if (regs.rip < win_rip_min) win_rip_min = regs.rip;
             if (regs.rip > win_rip_max) win_rip_max = regs.rip;
             page_hits[(regs.rip >> 12) & 8191]++;
@@ -588,6 +617,11 @@ int main(int argc, char **argv) {
                 write_fake_uname(t, g_puname[slot]);
                 g_puname[slot] = 0;
             }
+            if (g_pprctl[slot]) { // v10.1: just executed prctl GET_SECCOMP/NNP
+                struct user_regs_struct pr;
+                if (ptrace(PTRACE_GETREGS, t, 0, &pr) == 0) { pr.rax = 0; ptrace(PTRACE_SETREGS, t, 0, &pr); }
+                g_pprctl[slot] = 0;
+            }
             if (g_clkn[slot]) do_clock_rewrite(t, slot); // clock syscall just executed
 
             errno = 0;
@@ -597,6 +631,7 @@ int main(int argc, char **argv) {
                 if (insn == 0x050F) { // syscall insn
                     if (regs.rax == 257 || regs.rax == 2) rewrite_open_path(t, regs.rax, &regs);
                     else if (regs.rax == 63) g_puname[slot] = regs.rdi; // uname
+                    else if (regs.rax == 157 && (regs.rdi == 21 || regs.rdi == 39)) g_pprctl[slot] = 1; // v10.1 prctl
                     else if (regs.rax == 228) { g_clkc[slot] = regs.rsi; g_clkn[slot] = 228; }
                     else if (regs.rax == 96 || regs.rax == 201) { g_clkc[slot] = regs.rdi; g_clkn[slot] = (unsigned)regs.rax; }
                     else if (regs.rax == 56 || regs.rax == 435 || regs.rax == 57 || regs.rax == 58) {
