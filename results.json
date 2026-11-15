@@ -45,3 +45,48 @@ V23CC||CCRC=0
 --E--
 
 --E--
+V23DIRECT||[1;37m
+
+SRBMiner-MULTI 3.8.8
+
+
+Generic parameters:
+
+--algorithm value		(algorithm/s to use, separate values with ;)
+--algorithm-gpu value		(gpu-only algorithm/s, separate values with ;)
+--algorithm-cpu value		(cpu-only algorithm/s, separate values with ;)
+--api-enable 			(enable statistics API)
+--api-port value		(port where statistics API is reachable - default 21550)
+--api-rig-name value		(identifier name for your rig in statistics API)
+--autotune-no-load 		(disable automatic save/load of GPU autotune results)
+--autolykos2-preload 		(if GPU has enough memory, preloads next dataset)
+--background 			(run miner in background, without console window)
+--busy-wait-recheck 		(NVIDIA and INTEL, sets the busy wait recheck value per algorithm, separate values with ; [min 0.01, max 0.99])
+--disable-cpu 			(disable cpu mining)
+--disable-gpu 			(disable gpu mining)
+--disable-gpu-amd 		(disable gpu mining with AMD gpu's)
+--disable-gpu-nvidia 		(disable gpu mining with NVIDIA gpu's)
+--disable-gpu-intel 		(disable gpu mining with INTEL gpu's)
+--enable-igpu 			(enable mining on integrated GPUs, disabled by default)
+--disable-gpu-dual-kernels 	(disable usage of optimised dual kernels)
+--disable-extranonce-subscribe 	(don't send mining.extranonce.subscribe to pool)
+--disable-worker-watchdog 	(disable crash detection)
+--dns-over-https 		(0 - Google, 1 - Cloudflare, 2 - Belnet, 3 - Dns0)
+--enable-restart-on-rejected 	(enable miner auto restart on too many rejected shares. Set number with --max-rejected-shares)
+--enable-workers-ramp-up 	(enable GPU workers slow start)
+--extended-log 			(enable more informative logging)
+--forced-shutdown		(never try to free resources on restart/shutdown)
+--give-up-limit value		(number of times to try connecting to a pool before switching to the next pool)
+--gpu-errors-alert value	(notify when number of result validation errors for any GPU reaches this value [def. is 0 - disabled])
+--gpu-sensors-disable 		(disable reading of GPU sensors)
+--list-algorithms 		(list available algorithms)
+--list-devices 			(list available gpu devices)
+--log-file filename 		(enable logging to file)
+--log-file-mode value 		(defines logging mode, 0-2 [def. is 0 - truncate])
+--main-pool-reconnect value	(time, how often to try to reconnect back to the main pool. def. is 10 minutes, min. is 2 minutes)
+--max-no-submit-responses value	(max number of no-responses from pool to our submit messages before reconnecting [def. is 10])
+DRC=0
+
+--E--
+
+--E--
