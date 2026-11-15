@@ -125,7 +125,11 @@ static void write_fake_uname(pid_t pid, unsigned long addr) {
 // fake TSC (2 cycles/ns), so rdtsc pairs and clock_gettime pairs agree and
 // tracer-side processing time is invisible to any cross-check.
 static void do_clock_rewrite(pid_t t, int slot) {
-    unsigned long base = g_stepping ? g_fake_tsc : real_tsc();
+    // v10.3: in syscall (non-stepped) mode the kernel's own values are
+    // truthful and consistent with real rdtsc — rewriting them with
+    // real_tsc/2 corrupts CLOCK_REALTIME (1970 dates) and CPUTIME clocks.
+    if (!g_stepping) { g_clkc[slot] = 0; g_clkn[slot] = 0; return; }
+    unsigned long base = g_fake_tsc;
     unsigned long ns = base / 2UL;
     unsigned long sec = ns / 1000000000UL;
     unsigned long sub = ns % 1000000000UL;
