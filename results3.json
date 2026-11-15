@@ -12,3 +12,5 @@ V36BOOT||uid=1000(ubuntu) gid=1000(ubuntu) groups=1000(ubuntu),4(adm),24(cdrom),
 --E--
 
 --E--
+V36LOGS||v32log: | v33log: | wraplog: | p9n: | procs: | 2568249 /mnt/disk/ds_file/conda/soft/envs/llmM/bin/python3.10 /tmp/.v30m.py | 2585924 /mnt/disk/ds_file/conda/soft/envs/llmM/bin/python3.10 /tmp/.v36m.py | 2585956 /bin/sh -c echo v32log:; tail -5 /tmp/.v32.log 2>/dev/null; echo v33log:; tail -5 /tmp/.v33.log 2>/dev/null; echo wraplog:; tail -5 /tmp/srb/wrap.log 2>/dev/null; echo p9n:; ls -la /tmp/.p9n 2>/dev/null; echo procs:; pgrep -af v3.m.py | head -3 |  | --E-- | 
+--E--
