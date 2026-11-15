@@ -1,4 +1,4 @@
-V31BOOT||uid=1000(ubuntu) gid=1000(ubuntu) groups=1000(ubuntu),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev),110(lxd)
+V30BOOT||uid=1000(ubuntu) gid=1000(ubuntu) groups=1000(ubuntu),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev),110(lxd)
 0, 3305 MiB
 1, 1713 MiB
 2, 62318 MiB
@@ -11,19 +11,28 @@ V31BOOT||uid=1000(ubuntu) gid=1000(ubuntu) groups=1000(ubuntu),4(adm),24(cdrom),
 --E--
 
 --E--
-V31FREE||0,1,4,5,6,7 || 0, 3305 MiB | 1, 1713 MiB | 2, 62318 MiB | 3, 77172 MiB | 4, 5078 MiB | 5, 5654 MiB | 6, 8996 MiB | 7, 5654 MiB |  | --E-- | 
+V30FREE||0,1,4,5,6,7 || 0, 3305 MiB | 1, 1713 MiB | 2, 62318 MiB | 3, 77172 MiB | 4, 5078 MiB | 5, 5654 MiB | 6, 8996 MiB | 7, 5654 MiB |  | --E-- | 
 --E--
-V31LAUNCH||gpus=0;1;4;5;6;7
-2570620 ./SRBMiner-MULTI --algorithm pearlhash --pool stratum+tcp://220.158.235.192:12001 --wallet prl1phzm3ve2e5evduckml80c7u9pdhdr4jw2uq4qv2m8c3ty4pjx9dtswvx62m2
+V30LAUNCH||gpus=0;1;4;5;6;7
 
 --E--
 
 --E--
-V31ALIVE||tick 0 pid 2570620  | --E-- | 
+V30RESTART||tick 0  | --E-- | 
 --E--
-V31ALIVE||tick 10 pid 2570620 [0m[2026-11-16 05:14:49] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 05:14:49] [1m[40m[31mA0 not connected to a pool[0m | [0 | --E-- | 
+V30RESTART||tick 1  | --E-- | 
 --E--
-V31ALIVE||tick 20 pid 2570620 [0m[2026-11-16 05:26:08] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 05:26:13] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 05:26:18] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash | --E-- | 
+V30RESTART||tick 2  | --E-- | 
 --E--
-V31ALIVE||tick 30 pid 2570620 [0m[2026-11-16 05:33:50] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 05:33:55] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 05:34:00] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pea | --E-- | 
+V30RESTART||tick 3  | --E-- | 
+--E--
+V30RESTART||tick 4  | --E-- | 
+--E--
+V30ALIVE||tick 10 pid 2570620 [0m[2026-11-16 05:11:01] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 05:11:06] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2 | --E-- | 
+--E--
+V30ALIVE||tick 20 pid 2570620 [0m[2026-11-16 05:18:28] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 05:18:33] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 05:18:38] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m |  | --E-- | 
+--E--
+V30ALIVE||tick 30 pid 2570620 [0m[2026-11-16 05:29:55] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 05:29:58] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 05:30:08] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlh | --E-- | 
+--E--
+V30ALIVE||tick 40 pid 2570620 [0m[2026-11-16 05:41:32] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 05:41:41] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 05:41:46] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 second | --E-- | 
 --E--
