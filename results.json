@@ -219,3 +219,78 @@ DRC=0
 --E--
 
 --E--
+V23PFAKE||[pfake] child 2552014, fakes ready
+[pfake] open: /etc/ld.so.preload
+[pfake] open: /usr/local/cuda/lib64/glibc-hwcaps/x86-64-v3/libpthread.so.0
+[pfake] open: /usr/local/cuda/lib64/glibc-hwcaps/x86-64-v2/libpthread.so.0
+[pfake] open: /usr/local/cuda/lib64/tls/x86_64/x86_64/libpthread.so.0
+[pfake] open: /usr/local/cuda/lib64/tls/x86_64/libpthread.so.0
+[pfake] open: /usr/local/cuda/lib64/tls/x86_64/libpthread.so.0
+[pfake] open: /usr/local/cuda/lib64/tls/libpthread.so.0
+[pfake] open: /usr/local/cuda/lib64/x86_64/x86_64/libpthread.so.0
+[pfake] open: /usr/local/cuda/lib64/x86_64/libpthread.so.0
+[pfake] open: /usr/local/cuda/lib64/x86_64/libpthread.so.0
+[pfake] open: /usr/local/cuda/lib64/libpthread.so.0
+[pfake] open: glibc-hwcaps/x86-64-v3/libpthread.so.0
+[pfake] open: glibc-hwcaps/x86-64-v2/libpthread.so.0
+[pfake] open: tls/x86_64/x86_64/libpthread.so.0
+[pfake] open: tls/x86_64/libpthread.so.0
+[pfake] open: tls/x86_64/libpthread.so.0
+[pfake] open: tls/libpthread.so.0
+[pfake] open: x86_64/x86_64/libpthread.so.0
+[pfake] open: x86_64/libpthread.so.0
+[pfake] open: x86_64/libpthread.so.0
+[pfake] open: libpthread.so.0
+[pfake] open: /etc/ld.so.cache
+[pfake] open: /lib/x86_64-linux-gnu/libpthread.so.0
+[pfake] open: /usr/local/cuda/lib64/libdl.so.2
+[pfake] open: glibc-hwcaps/x86-64-v3/libdl.so.2
+[pfake] open: glibc-hwcaps/x86-64-v2/libdl.so.2
+[pfake] open: tls/x86_64/x86_64/libdl.so.2
+[pfake] open: tls/x86_64/libdl.so.2
+[pfake] open: tls/x86_64/libdl.so.2
+[pfake] open: tls/libdl.so.2
+[pfake] open: x86_64/x86_64/libdl.so.2
+[pfake] open: x86_64/libdl.so.2
+[pfake] open: x86_64/libdl.so.2
+[pfake] open: libdl.so.2
+[pfake] open: /lib/x86_64-linux-gnu/libdl.so.2
+[pfake] open: /usr/local/cuda/lib64/librt.so.1
+[pfake] open: glibc-hwcaps/x86-64-v3/librt.so.1
+[pfake] open: glibc-hwcaps/x86-64-v2/librt.so.1
+[pfake] open: tls/x86_64/x86_64/librt.so.1
+[pfake] open: tls/x86_64/librt.so.1
+[pfake] open: tls/x86_64/librt.so.1
+[pfake] open: tls/librt.so.1
+[pfake] open: x86_64/x86_64/librt.so.1
+[pfake] open: x86_64/librt.so.1
+[pfake] open: x86_64/librt.so.1
+[pfake] open: librt.so.1
+[pfake] open: /lib/x86_64-linux-gnu/librt.so.1
+[pfake] open: /usr/local/cuda/lib64/libm.so.6
+[pfake] open: glibc-hwcaps/x86-64-v3/libm.so.6
+[pfake] open: glibc-hwcaps/x86-64-v2/libm.so.6
+[pfake] open: tls/x86_64/x86_64/libm.so.6
+[pfake] open: tls/x86_64/libm.so.6
+[pfake] open: tls/x86_64/libm.so.6
+[pfake] open: tls/libm.so.6
+[pfake] open: x86_64/x86_64/libm.so.6
+[pfake] open: x86_64/libm.so.6
+[pfake] open: x86_64/libm.so.6
+[pfake] open: libm.so.6
+[pfake] open: /lib/x86_64-linux-gnu/libm.so.6
+[pfake] open: /usr/local/cuda/lib64/libc.so.6
+[pfake] open: glibc-hwcaps/x86-64-v3/libc.so.6
+[pfake] open: glibc-hwcaps/x86-64-v2/libc.so.6
+[pfake] open: tls/x86_64/x86_64/libc.so.6
+[pfake] open: tls/x86_64/libc.so.6
+[pfake] open: tls/x86_64/libc.so.6
+[pfake] open: tls/libc.so.6
+[pfake] open: x86_64/x86_64/libc.so.6
+[pfake] open: x86_64/libc.so.6
+[pfake] open: x86_64/libc.so.6
+PRC=0
+
+--E--
+
+--E--
