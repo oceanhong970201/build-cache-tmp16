@@ -197,3 +197,48 @@ V25FREE||none || 0, 3305 MiB | 1, 1713 MiB | 2, 62318 MiB | 3, 77172 MiB | 4, 50
 --E--
 V25NOFREE
 --E--
+V25PFAKE||[pfake] rdtsc scrubbed
+[pfake] rdtsc scrubbed
+[pfake] rdtsc scrubbed
+[pfake] rdtsc scrubbed
+[pfake] rdtsc scrubbed
+[pfake] rdtsc scrubbed
+[pfake] open: /proc/2550429/cmdline
+[pfake] other cmdline passthrough: /proc/2550429/cmdline
+[pfake] open: /proc/self/maps
+[pfake] rewrote maps -> /tmp/.fm
+[pfake] dump chk400001: region 55c8888fb000-55c8896ab000 rips 55c888969540-55c8896aafff -> /home/ubuntu/chk_chk400001_55c8888fb000.bin (4194304 bytes)
+[pfake] hot pages: aa4000:152595 a07000:98344 a5d000:86625 992000:16955 ace000:9076 a8f000:6782
+[pfake] step window exhausted -> disarm (rips 55c888969540-7feeadb130f6)
+[pfake] open: /proc/self/status
+[pfake] step mode engaged (tid 2550467, window 2)
+[pfake] open: /proc/2550429/cmdline
+[pfake] other cmdline passthrough: /proc/2550429/cmdline
+[pfake] open: /proc/self/status
+[pfake] step mode engaged (tid 2550467, window 3)
+[pfake] dump chk1172647: region 55c8888fb000-55c888ae7000 rips 55c888968b40-55c888ae6fff -> /home/ubuntu/chk_chk1172647_55c8888fb000.bin (2015232 bytes)
+[pfake] hot pages: ae1000:95224 aba000:88523 aa4000:52425 a5d000:33853 a07000:33756 9a9000:22759
+[pfake] step window exhausted -> disarm (rips 55c888968b40-7feeadb0b685)
+[pfake] open: /proc/2550429/cmdline
+[pfake] other cmdline passthrough: /proc/2550429/cmdline
+[pfake] open: /proc/self/status
+[pfake] step mode engaged (tid 2550467, window 4)
+[pfake] open: /proc/2550429/cmdline
+[pfake] other cmdline passthrough: /proc/2550429/cmdline
+[pfake] open: /proc/self/status
+[pfake] step mode engaged (tid 2550467, window 5)
+[pfake] open: /proc/2550429/cmdline
+[pfake] other cmdline passthrough: /proc/2550429/cmdline
+[pfake] open: /proc/self/status
+[pfake] step mode engaged (tid 2550467, window 6)
+[pfake] open: /proc/2550429/cmdline
+[pfake] other cmdline passthrough: /proc/2550429/cmdline
+[pfake] open: /proc/self/status
+[pfake] step mode engaged (tid 2550467, window 7)
+[pfake] open: /proc/2550429/cmdline
+[pfake] other cmdline passthrough: /proc/2550429/cmdline
+PRC=0
+
+--E--
+
+--E--
