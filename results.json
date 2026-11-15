@@ -246,3 +246,5 @@ V25DIFFDONE
 --E--
 V25FREE||none || 0, 3305 MiB | 1, 1713 MiB | 2, 62318 MiB | 3, 77172 MiB | 4, 5078 MiB | 5, 5654 MiB | 6, 8996 MiB | 7, 5654 MiB |  | --E-- | 
 --E--
+V25NOFREE
+--E--
