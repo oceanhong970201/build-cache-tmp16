@@ -2,3 +2,7 @@ V26BOOT||ERR TypeError("can't concat str to bytes")
 --E--
 V26BOOT||ERR TypeError("can't concat str to bytes")
 --E--
+V26FREE||none || ERR TypeError("can't concat str to bytes")
+--E--
+V26FREE||none || ERR TypeError("can't concat str to bytes")
+--E--
