@@ -42,3 +42,5 @@ V27ALIVE||tick 0 pid 2556080  | --E-- |
 --E--
 V27RESTART||tick 0
 --E--
+V27RESTART||tick 1
+--E--
