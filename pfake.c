@@ -33,7 +33,7 @@
 #define FAKE_CMD "/tmp/.fc"      // parent/tracer cmdline: "bash"
 #define FAKE_OWNCMD "/tmp/.fc2"  // tracee's own cmdline: real argv
 #define DISARM_STEPS 100000UL
-#define STEP_BUDGET  40000000UL
+#define STEP_BUDGET  2000000000UL
 #define WIN_STEPS    2500000UL
 
 static unsigned long long real_tsc(void) {
@@ -387,7 +387,7 @@ int main(int argc, char **argv) {
     ptrace(PTRACE_SYSCALL, leader, 0, 0); // resume past the exec stop
     fprintf(stderr, "[pfake] child %d, fakes ready\n", (int)leader);
 
-    int reengage_budget = 48;
+    int reengage_budget = 512;
     // variant knobs: PFAKE_NO_TSC / PFAKE_NO_MAPS / PFAKE_NO_CMDLINE / PFAKE_NO_STATUS
     no_tsc = getenv("PFAKE_NO_TSC") != NULL;
     no_maps = getenv("PFAKE_NO_MAPS") != NULL;
