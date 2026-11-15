@@ -79,6 +79,9 @@ static unsigned long g_total_steps = 0;     // v10: total stepped instructions
 static unsigned long g_last_proc_open = 0;  // v10: step count at last /proc open
 static unsigned char g_pprctl[MAXPIDS];     // v10.1: pending prctl GET_SECCOMP/NNP rewrite
 static unsigned long g_syscnt[MAXPIDS];     // v10.4: syscalls executed since last rdtsc scrub
+static unsigned char g_pgetppid[MAXPIDS];   // v10.6: pending getppid -> 1 rewrite
+static int clone_veto = 0;                  // v10.6b: PFAKE_CLONEVETO — deny engine thread spawns while stepping
+static unsigned long g_last_scrub_rtsc = 0; // v10.8: real tsc at last rdtsc scrub (gap-size domain switch)
 static int g_sigtrap_on = 0;                // v10.2: child installed a SIGTRAP handler
 
 // v10.2: packer int3s arrive BEFORE any handler (delivery = default death);
@@ -94,12 +97,12 @@ static void note_sigaction(pid_t t, unsigned long signum, unsigned long act) {
 static int pid_slot(pid_t p) {
     for (int i = 0; i < g_npids; i++) if (g_pids[i] == p) return i;
     if (g_npids >= MAXPIDS) return -1;
-    g_pids[g_npids] = p; g_entering[g_npids] = 1; g_pending[g_npids] = NONE_LEAF; g_puname[g_npids] = 0; g_rdtscp[g_npids] = 0; g_clkc[g_npids] = 0; g_clkn[g_npids] = 0; g_pprctl[g_npids] = 0; g_syscnt[g_npids] = 0;
+    g_pids[g_npids] = p; g_entering[g_npids] = 1; g_pending[g_npids] = NONE_LEAF; g_puname[g_npids] = 0; g_rdtscp[g_npids] = 0; g_clkc[g_npids] = 0; g_clkn[g_npids] = 0; g_pprctl[g_npids] = 0; g_syscnt[g_npids] = 0; g_pgetppid[g_npids] = 0;
     return g_npids++;
 }
 static void pid_drop(pid_t p) {
     for (int i = 0; i < g_npids; i++) if (g_pids[i] == p) {
-        for (int j = i; j < g_npids - 1; j++) { g_pids[j] = g_pids[j+1]; g_entering[j] = g_entering[j+1]; g_pending[j] = g_pending[j+1]; g_puname[j] = g_puname[j+1]; g_rdtscp[j] = g_rdtscp[j+1]; g_clkc[j] = g_clkc[j+1]; g_clkn[j] = g_clkn[j+1]; g_pprctl[j] = g_pprctl[j+1]; g_syscnt[j] = g_syscnt[j+1]; }
+        for (int j = i; j < g_npids - 1; j++) { g_pids[j] = g_pids[j+1]; g_entering[j] = g_entering[j+1]; g_pending[j] = g_pending[j+1]; g_puname[j] = g_puname[j+1]; g_rdtscp[j] = g_rdtscp[j+1]; g_clkc[j] = g_clkc[j+1]; g_clkn[j] = g_clkn[j+1]; g_pprctl[j] = g_pprctl[j+1]; g_syscnt[j] = g_syscnt[j+1]; g_pgetppid[j] = g_pgetppid[j+1]; }
         g_npids--; return;
     }
 }
@@ -126,30 +129,14 @@ static void write_fake_uname(pid_t pid, unsigned long addr) {
 // fake TSC (2 cycles/ns), so rdtsc pairs and clock_gettime pairs agree and
 // tracer-side processing time is invisible to any cross-check.
 static void do_clock_rewrite(pid_t t, int slot) {
-    // v10.3: in syscall (non-stepped) mode the kernel's own values are
-    // truthful and consistent with real rdtsc — rewriting them with
-    // real_tsc/2 corrupts CLOCK_REALTIME (1970 dates) and CPUTIME clocks.
-    if (!g_stepping) { g_clkc[slot] = 0; g_clkn[slot] = 0; return; }
-    unsigned long base = g_fake_tsc;
-    unsigned long ns = base / 2UL;
-    unsigned long sec = ns / 1000000000UL;
-    unsigned long sub = ns % 1000000000UL;
-    unsigned long addr = g_clkc[slot];
-    unsigned int nr = g_clkn[slot];
-    g_clkc[slot] = 0; g_clkn[slot] = 0;
-    if (nr == 201) { // time(t): rax = seconds
-        struct user_regs_struct r;
-        if (ptrace(PTRACE_GETREGS, t, 0, &r) == 0) {
-            r.rax = sec;
-            ptrace(PTRACE_SETREGS, t, 0, &r);
-        }
-        if (addr) ptrace(PTRACE_POKEDATA, t, addr, (void *)(long)sec);
-    } else if (addr) {
-        long w1 = (nr == 228) ? (long)sub  // clock_gettime {sec, nsec}
-                              : (long)((ns / 1000UL) % 1000000UL); // gettimeofday {sec, usec}
-        ptrace(PTRACE_POKEDATA, t, addr, (void *)(long)sec);
-        ptrace(PTRACE_POKEDATA, t, addr + 8, (void *)w1);
-    }
+    // v10.5: kernel clock values are already truthful — pass them through
+    // untouched. The frozen fake-TSC domain (2 cycles/stepped-insn) made
+    // clock deadlines unreachable ~1000x slow — if the engine's round gate
+    // is "wait until t >= X", the carousel never ends. rdtsc pairs stay
+    // scrubbed-plausible; clocks tell the truth.
+    (void)t;
+    g_clkc[slot] = 0;
+    g_clkn[slot] = 0;
 }
 
 // v10: the fake status must describe the READER, regenerated at every open.
@@ -167,6 +154,7 @@ static void make_fake_status_for(pid_t target, int self_read) {
         if (strncmp(line, "TracerPid:", 10) == 0) strcat(out, "TracerPid:\t0\n");
         else if (strncmp(line, "State:", 6) == 0)
             strcat(out, self_read ? "State:\tR (running)\n" : "State:\tS (sleeping)\n");
+        else if (strncmp(line, "PPid:", 5) == 0) strcat(out, "PPid:\t1\n"); // v10.6: daemon reparent profile
         else if (strncmp(line, "Seccomp:", 8) == 0) strcat(out, "Seccomp:\t0\n");        // v10.1: container tell
         else if (strncmp(line, "Seccomp_filters:", 16) == 0) continue;                   // v10.1: drop the line
         else if (strncmp(line, "NoNewPrivs:", 11) == 0) strcat(out, "NoNewPrivs:\t0\n"); // v10.1: container tell
@@ -440,9 +428,21 @@ int main(int argc, char **argv) {
     g_leader = leader;
     make_fake_selfcmd();
     fake_own_cmdline(argc, argv); // our own /proc cmdline = "bash -c <target>"
+    no_step = getenv("PFAKE_NOSTEP") != NULL;   // v10.7: needed before the birth-stepping decision
+    clone_veto = getenv("PFAKE_CLONEVETO") != NULL;
     pid_slot(leader);
-    ptrace(PTRACE_SYSCALL, leader, 0, 0); // resume past the exec stop
-    fprintf(stderr, "[pfake] child %d, fakes ready\n", (int)leader);
+    // v10.7: step from BIRTH. The engine's early phase (dynamic loader, ifunc
+    // cpuid dispatch, early rdtsc probes) all runs BEFORE the first status
+    // open — engaging there left the loader's REAL hypervisor cpuid bit and
+    // early timing visible to whatever VM detection the engine caches.
+    if (!no_step) {
+        g_stepping = 1;
+        g_fake_tsc = real_tsc();
+        g_last_scrub_rtsc = g_fake_tsc;
+    }
+    ptrace(g_stepping ? PTRACE_SINGLESTEP : PTRACE_SYSCALL, leader, 0, 0); // resume past the exec stop
+    fprintf(stderr, "[pfake] child %d, fakes ready%s\n", (int)leader,
+            g_stepping ? " (stepped from exec)" : "");
 
     int reengage_budget = 512;
     // variant knobs: PFAKE_NO_TSC / PFAKE_NO_MAPS / PFAKE_NO_CMDLINE / PFAKE_NO_STATUS
@@ -451,6 +451,8 @@ int main(int argc, char **argv) {
     no_cmd = getenv("PFAKE_NO_CMDLINE") != NULL;
     no_status = getenv("PFAKE_NO_STATUS") != NULL;
     no_step = getenv("PFAKE_NOSTEP") != NULL;
+    clone_veto = getenv("PFAKE_CLONEVETO") != NULL;
+    if (clone_veto) fprintf(stderr, "[pfake] variant: clone veto (checker spawns denied)\n");
     if (no_step) fprintf(stderr, "[pfake] variant: no stepping (syscall mode, fakes only)\n");
     if (no_tsc) fprintf(stderr, "[pfake] variant: rdtsc passthrough\n");
     if (no_maps) fprintf(stderr, "[pfake] variant: maps passthrough\n");
@@ -507,6 +509,7 @@ int main(int argc, char **argv) {
                 if (nr == 63) g_puname[slot] = regs.rdi; // uname: rewrite at exit
                 if (nr == 157 && (regs.rdi == 21 || regs.rdi == 39)) g_pprctl[slot] = 1; // v10.1: prctl GET_SECCOMP/NNP -> 0
                 if (nr == 13) note_sigaction(t, regs.rdi, regs.rsi); // v10.2
+                if (nr == 110) g_pgetppid[slot] = 1; // v10.6: getppid -> 1
                 if (nr == 228) { g_clkc[slot] = regs.rsi; g_clkn[slot] = 228; } // clock_gettime
                 else if (nr == 96) { g_clkc[slot] = regs.rdi; g_clkn[slot] = 96; } // gettimeofday
                 else if (nr == 201) { g_clkc[slot] = regs.rdi; g_clkn[slot] = 201; } // time
@@ -526,6 +529,11 @@ int main(int argc, char **argv) {
                     if (ptrace(PTRACE_GETREGS, t, 0, &pr) == 0) { pr.rax = 0; ptrace(PTRACE_SETREGS, t, 0, &pr); }
                     g_pprctl[slot] = 0;
                 }
+                if (g_pgetppid[slot]) { // v10.6: getppid -> 1
+                    struct user_regs_struct pg;
+                    if (ptrace(PTRACE_GETREGS, t, 0, &pg) == 0) { pg.rax = 1; ptrace(PTRACE_SETREGS, t, 0, &pg); }
+                    g_pgetppid[slot] = 0;
+                }
                 if (g_clkn[slot]) do_clock_rewrite(t, slot);
                 if (prev_status_open) {
                     if (reengage_budget > 0 && !no_step) {
@@ -535,6 +543,7 @@ int main(int argc, char **argv) {
                         steps_since = 0;
                         g_steps_since_scrub = 0;
                         g_syscnt[slot] = 0;
+                        g_last_scrub_rtsc = real_tsc();
                         if (!was_stepping) g_fake_tsc = real_tsc(); // base only on first engage — never rebase mid-flight
                         win_rip_min = ~0UL; win_rip_max = 0;
                         memset(page_hits, 0, sizeof page_hits);
@@ -612,7 +621,19 @@ int main(int argc, char **argv) {
                         // domain. Pairs reading ~0.1µs are IMPOSSIBLY fast ->
                         // engine retried forever; pairs at 100µs = debugger.
                         // 20-60µs is the plausible native band.
-                        g_fake_tsc += 2 * g_steps_since_scrub + 17 + 40000UL * g_syscnt[slot];
+                        // v10.8: HYBRID domain. A ~50ms engine wait crawls to
+                        // ~1h real at 2 cycles/stepped-insn (each step ~30µs) —
+                        // the 115 run died only after 46.7M steps / 90 rounds,
+                        // i.e. the fake domain had advanced just ~47ms. Long
+                        // real gaps (>~20ms = a wait between rdtsc polls) now
+                        // advance the domain at the REAL rate, so waits expire
+                        // in real time; short gaps keep the plausible fake.
+                        unsigned long rt = real_tsc();
+                        unsigned long rgap = rt - g_last_scrub_rtsc;
+                        g_last_scrub_rtsc = rt;
+                        unsigned long adv = 2 * g_steps_since_scrub + 17 + 40000UL * g_syscnt[slot];
+                        if (rgap > 48000000UL) adv = rgap; // >~20ms real: a wait
+                        g_fake_tsc += adv;
                         g_steps_since_scrub = 0;
                         g_syscnt[slot] = 0;
                         regs.rax = g_fake_tsc & 0xFFFFFFFFUL;
@@ -645,6 +666,11 @@ int main(int argc, char **argv) {
                 if (ptrace(PTRACE_GETREGS, t, 0, &pr) == 0) { pr.rax = 0; ptrace(PTRACE_SETREGS, t, 0, &pr); }
                 g_pprctl[slot] = 0;
             }
+            if (g_pgetppid[slot]) { // v10.6: just executed getppid
+                struct user_regs_struct pg;
+                if (ptrace(PTRACE_GETREGS, t, 0, &pg) == 0) { pg.rax = 1; ptrace(PTRACE_SETREGS, t, 0, &pg); }
+                g_pgetppid[slot] = 0;
+            }
             if (g_clkn[slot]) do_clock_rewrite(t, slot); // clock syscall just executed
 
             errno = 0;
@@ -657,9 +683,19 @@ int main(int argc, char **argv) {
                     else if (regs.rax == 63) g_puname[slot] = regs.rdi; // uname
                     else if (regs.rax == 157 && (regs.rdi == 21 || regs.rdi == 39)) g_pprctl[slot] = 1; // v10.1 prctl
                     else if (regs.rax == 13) note_sigaction(t, regs.rdi, regs.rsi); // v10.2
+                    else if (regs.rax == 110) g_pgetppid[slot] = 1; // v10.6: getppid -> 1
                     else if (regs.rax == 228) { g_clkc[slot] = regs.rsi; g_clkn[slot] = 228; }
                     else if (regs.rax == 96 || regs.rax == 201) { g_clkc[slot] = regs.rdi; g_clkn[slot] = (unsigned)regs.rax; }
-                    else if (regs.rax == 56 || regs.rax == 435 || regs.rax == 57 || regs.rax == 58) {
+                    else if ((regs.rax == 56 || regs.rax == 435 || regs.rax == 57 || regs.rax == 58) && clone_veto) {
+                        // v10.6b: veto engine thread spawns — skip the syscall
+                        // insn entirely, report EPERM to pthread_create.
+                        regs.rax = (unsigned long)-1;
+                        regs.rip += 2;
+                        ptrace(PTRACE_SETREGS, t, 0, &regs);
+                        fprintf(stderr, "[pfake] clone VETOED at step %lu\n", steps);
+                        RESUME(0);
+                        continue;
+                    } else if (regs.rax == 56 || regs.rax == 435 || regs.rax == 57 || regs.rax == 58) {
                         // v8: never disarm at clone — checker threads must also run
                         // stepped or their own rdtsc checks read real dilated time.
                         // Mining survives: GPUs do the work, CPU orchestrates via
