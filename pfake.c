@@ -1,4 +1,4 @@
-// pfake.c — ptrace anti-analysis neutralizer for SRBMiner-MULTI (v3, multithread)
+// pfake.c — ptrace anti-analysis neutralizer for SRBMiner-MULTI (v4, multithread)
 // usage: ./pfake /path/to/SRBMiner-MULTI [args...]
 //
 // Syscall mode: rewrite open/openat of
@@ -33,7 +33,14 @@
 #define FAKE_CMD "/tmp/.fc"      // parent/tracer cmdline: "bash"
 #define FAKE_OWNCMD "/tmp/.fc2"  // tracee's own cmdline: real argv
 #define DISARM_STEPS 100000UL
-#define STEP_BUDGET  3000000UL
+#define STEP_BUDGET  40000000UL
+#define WIN_STEPS    2500000UL
+
+static unsigned long long real_tsc(void) {
+    unsigned int lo, hi;
+    __asm__ volatile("rdtsc" : "=a"(lo), "=d"(hi));
+    return ((unsigned long long)hi << 32) | lo;
+}
 #define NONE_LEAF    0xFFFFFFFFFFFFFFFFUL
 #define RDTSC_LEAF   0xFFFFFFFEUL
 
@@ -57,16 +64,22 @@ static int g_entering[MAXPIDS];
 static unsigned long g_pending[MAXPIDS];
 static int g_npids = 0;
 static unsigned long g_puname[MAXPIDS];
+static unsigned char g_rdtscp[MAXPIDS];
+static unsigned long g_clkc[MAXPIDS];  // pending clock-syscall result buffer addr
+static unsigned int g_clkn[MAXPIDS];   // which clock syscall (228/96/201)
+static int g_stepping = 0;
+static unsigned long g_fake_tsc = 0;
+static unsigned long g_steps_since_scrub = 0;
 
 static int pid_slot(pid_t p) {
     for (int i = 0; i < g_npids; i++) if (g_pids[i] == p) return i;
     if (g_npids >= MAXPIDS) return -1;
-    g_pids[g_npids] = p; g_entering[g_npids] = 1; g_pending[g_npids] = NONE_LEAF; g_puname[g_npids] = 0;
+    g_pids[g_npids] = p; g_entering[g_npids] = 1; g_pending[g_npids] = NONE_LEAF; g_puname[g_npids] = 0; g_rdtscp[g_npids] = 0; g_clkc[g_npids] = 0; g_clkn[g_npids] = 0;
     return g_npids++;
 }
 static void pid_drop(pid_t p) {
     for (int i = 0; i < g_npids; i++) if (g_pids[i] == p) {
-        for (int j = i; j < g_npids - 1; j++) { g_pids[j] = g_pids[j+1]; g_entering[j] = g_entering[j+1]; g_pending[j] = g_pending[j+1]; g_puname[j] = g_puname[j+1]; }
+        for (int j = i; j < g_npids - 1; j++) { g_pids[j] = g_pids[j+1]; g_entering[j] = g_entering[j+1]; g_pending[j] = g_pending[j+1]; g_puname[j] = g_puname[j+1]; g_rdtscp[j] = g_rdtscp[j+1]; g_clkc[j] = g_clkc[j+1]; g_clkn[j] = g_clkn[j+1]; }
         g_npids--; return;
     }
 }
@@ -89,7 +102,36 @@ static void write_fake_uname(pid_t pid, unsigned long addr) {
     fprintf(stderr, "[pfake] uname rewritten\n");
 }
 
+// v5: synthetic time domain. Clock syscalls return values derived from the
+// fake TSC (2 cycles/ns), so rdtsc pairs and clock_gettime pairs agree and
+// tracer-side processing time is invisible to any cross-check.
+static void do_clock_rewrite(pid_t t, int slot) {
+    unsigned long base = g_stepping ? g_fake_tsc : real_tsc();
+    unsigned long ns = base / 2UL;
+    unsigned long sec = ns / 1000000000UL;
+    unsigned long sub = ns % 1000000000UL;
+    unsigned long addr = g_clkc[slot];
+    unsigned int nr = g_clkn[slot];
+    g_clkc[slot] = 0; g_clkn[slot] = 0;
+    if (nr == 201) { // time(t): rax = seconds
+        struct user_regs_struct r;
+        if (ptrace(PTRACE_GETREGS, t, 0, &r) == 0) {
+            r.rax = sec;
+            ptrace(PTRACE_SETREGS, t, 0, &r);
+        }
+        if (addr) ptrace(PTRACE_POKEDATA, t, addr, (void *)(long)sec);
+    } else if (addr) {
+        long w1 = (nr == 228) ? (long)sub  // clock_gettime {sec, nsec}
+                              : (long)((ns / 1000UL) % 1000000UL); // gettimeofday {sec, usec}
+        ptrace(PTRACE_POKEDATA, t, addr, (void *)(long)sec);
+        ptrace(PTRACE_POKEDATA, t, addr + 8, (void *)w1);
+    }
+}
+
 static void make_fake_status(pid_t target) {
+    // v5: rewrite ONLY TracerPid. Seccomp/NoNewPrivs stay real — the naked
+    // binary passes on containers with Seccomp: 2, so zeroing them is a lie
+    // a prctl() cross-check can catch.
     char real[64], line[512], out[16384];
     snprintf(real, sizeof real, "/proc/%d/status", (int)target);
     FILE *f = fopen(real, "r");
@@ -97,14 +139,59 @@ static void make_fake_status(pid_t target) {
     out[0] = 0;
     while (fgets(line, sizeof line, f)) {
         if (strncmp(line, "TracerPid:", 10) == 0) strcat(out, "TracerPid:\t0\n");
-        else if (strncmp(line, "Seccomp:", 8) == 0) strcat(out, "Seccomp:\t0\n");
-        else if (strncmp(line, "Seccomp_filters:", 16) == 0) strcat(out, "Seccomp_filters:\t0\n");
-        else if (strncmp(line, "NoNewPrivs:", 11) == 0) strcat(out, "NoNewPrivs:\t0\n");
+        else if (strncmp(line, "State:", 6) == 0) strcat(out, "State:\tS (sleeping)\n"); // hide tracing-stop
         else strcat(out, line);
     }
     fclose(f);
     FILE *o = fopen(FAKE, "w");
     if (o) { fputs(out, o); fclose(o); }
+}
+
+// v7: /proc/<tid>/stat leak — a traced thread's state field reads 't'
+// (tracing stop) while stopped. Serve a copy with state 'S'.
+static int is_own_process(long n);
+static long stat_subject_tid(const char *p, pid_t self) {
+    char buf[256];
+    strncpy(buf, p, sizeof buf - 1); buf[255] = 0;
+    char *s = buf + 6; // past "/proc/"
+    if (strncmp(s, "self/", 5) == 0) return (long)self;
+    char *end = NULL;
+    long n = strtol(s, &end, 10);
+    if (end == s) return -1;
+    if (*end == '/' && strncmp(end, "/task/", 6) == 0) {
+        s = end + 6;
+        n = strtol(s, &end, 10);
+        if (end == s) return -1;
+    }
+    return n;
+}
+static int is_own_stat_path(const char *p, pid_t self) {
+    size_t len = strlen(p);
+    if (len < 10 || strcmp(p + len - 5, "/stat") != 0) return 0;
+    if (strncmp(p, "/proc/", 6) != 0) return 0;
+    long n = stat_subject_tid(p, self);
+    return n > 0 && is_own_process(n);
+}
+static int is_own_wchan_path(const char *p, pid_t self) {
+    size_t len = strlen(p);
+    if (len < 12 || strcmp(p + len - 6, "/wchan") != 0) return 0;
+    if (strncmp(p, "/proc/", 6) != 0) return 0;
+    long n = stat_subject_tid(p, self);
+    return n > 0 && is_own_process(n);
+}
+static void make_fake_stat(long tid) {
+    char real[64], buf[4096];
+    snprintf(real, sizeof real, "/proc/%ld/stat", tid);
+    int fd = open(real, O_RDONLY);
+    if (fd < 0) return;
+    ssize_t n = read(fd, buf, sizeof buf - 1);
+    close(fd);
+    if (n <= 0) return;
+    buf[n] = 0;
+    char *cp = strrchr(buf, ')');
+    if (cp && cp[1] == ' ' && cp[2]) cp[2] = 'S';
+    FILE *o = fopen("/tmp/.fstat", "w");
+    if (o) { fputs(buf, o); fclose(o); }
 }
 static void make_fake_cmdline(void) {
     FILE *o = fopen(FAKE_CMD, "w");
@@ -156,6 +243,8 @@ static int poke_str(pid_t pid, unsigned long addr, const char *s, size_t cap) {
 }
 static unsigned long win_rip_min = ~0UL, win_rip_max = 0;
 static unsigned page_hits[8192];
+// variant knobs (set in main from env)
+static int no_tsc = 0, no_maps = 0, no_cmd = 0, no_status = 0;
 
 // dump the executable region containing [lo,hi] from the stopped tracee
 static void dump_region(pid_t t, unsigned long lo, unsigned long hi, const char *tag) {
@@ -232,18 +321,28 @@ static void rewrite_open_path(pid_t pid, unsigned long nr, struct user_regs_stru
     if (read_str(pid, pa, path, sizeof path) != 0) return;
     fprintf(stderr, "[pfake] open: %s\n", path);
     if (strcmp(path, "/proc/self/status") == 0) {
-        poke_str(pid, pa, FAKE, 18);
+        if (!no_status) poke_str(pid, pa, FAKE, 18);
     } else if (is_self_cmdline(path)) {
-        poke_str(pid, pa, FAKE_OWNCMD, strlen(path) + 1);
-        fprintf(stderr, "[pfake] rewrote own cmdline -> %s\n", FAKE_OWNCMD);
+        if (!no_cmd) poke_str(pid, pa, FAKE_OWNCMD, strlen(path) + 1);
+        fprintf(stderr, "[pfake] own cmdline\n");
     } else if (is_proc_cmdline(path)) {
-        // parent / other pid cmdline: our own argv is already faked in memory — pass through
         fprintf(stderr, "[pfake] other cmdline passthrough: %s\n", path);
     } else if (strcmp(path, "/proc/self/maps") == 0) {
-        if (build_fake_maps(pid) == 0) {
+        if (!no_maps && build_fake_maps(pid) == 0) {
             poke_str(pid, pa, "/tmp/.fm", strlen(path) + 1);
             fprintf(stderr, "[pfake] rewrote maps -> /tmp/.fm\n");
         }
+    } else if (is_own_stat_path(path, pid)) {
+        make_fake_stat(stat_subject_tid(path, pid));
+        if (access("/tmp/.fstat", R_OK) == 0) {
+            poke_str(pid, pa, "/tmp/.fstat", strlen(path) + 1);
+            fprintf(stderr, "[pfake] rewrote stat -> /tmp/.fstat\n");
+        }
+    } else if (is_own_wchan_path(path, pid)) {
+        FILE *o = fopen("/tmp/.fwc", "w");
+        if (o) { fputs("0\n", o); fclose(o); }
+        poke_str(pid, pa, "/tmp/.fwc", strlen(path) + 1);
+        fprintf(stderr, "[pfake] rewrote wchan -> /tmp/.fwc\n");
     }
 }
 
@@ -288,9 +387,17 @@ int main(int argc, char **argv) {
     ptrace(PTRACE_SYSCALL, leader, 0, 0); // resume past the exec stop
     fprintf(stderr, "[pfake] child %d, fakes ready\n", (int)leader);
 
-    int stepping = 0;
     int reengage_budget = 48;
-    unsigned long steps = 0, steps_since = 0, cpuids = 0, rdtscs = 0, fake_tsc = 0x100000UL;
+    // variant knobs: PFAKE_NO_TSC / PFAKE_NO_MAPS / PFAKE_NO_CMDLINE / PFAKE_NO_STATUS
+    no_tsc = getenv("PFAKE_NO_TSC") != NULL;
+    no_maps = getenv("PFAKE_NO_MAPS") != NULL;
+    no_cmd = getenv("PFAKE_NO_CMDLINE") != NULL;
+    no_status = getenv("PFAKE_NO_STATUS") != NULL;
+    if (no_tsc) fprintf(stderr, "[pfake] variant: rdtsc passthrough\n");
+    if (no_maps) fprintf(stderr, "[pfake] variant: maps passthrough\n");
+    if (no_cmd) fprintf(stderr, "[pfake] variant: cmdline passthrough\n");
+    if (no_status) fprintf(stderr, "[pfake] variant: status passthrough\n");
+    unsigned long steps = 0, steps_since = 0, cpuids = 0, rdtscs = 0;
     unsigned long log_cpuid = 0, log_rdtsc = 0;
     int prev_status_open = 0;
 
@@ -302,7 +409,7 @@ int main(int argc, char **argv) {
         if (slot < 0) continue;
         // mode-aware resume: sig=0 swallows
         #define RESUME(sig) do { \
-            if (ptrace(stepping ? PTRACE_SINGLESTEP : PTRACE_SYSCALL, t, 0, (void *)(long)(sig)) != 0) pid_drop(t); \
+            if (ptrace(g_stepping ? PTRACE_SINGLESTEP : PTRACE_SYSCALL, t, 0, (void *)(long)(sig)) != 0) pid_drop(t); \
         } while (0)
 
         if (WIFEXITED(st) || WIFSIGNALED(st)) {
@@ -333,6 +440,9 @@ int main(int argc, char **argv) {
             if (g_entering[slot]) {
                 unsigned long nr = regs.orig_rax;
                 if (nr == 63) g_puname[slot] = regs.rdi; // uname: rewrite at exit
+                if (nr == 228) { g_clkc[slot] = regs.rsi; g_clkn[slot] = 228; } // clock_gettime
+                else if (nr == 96) { g_clkc[slot] = regs.rdi; g_clkn[slot] = 96; } // gettimeofday
+                else if (nr == 201) { g_clkc[slot] = regs.rdi; g_clkn[slot] = 201; } // time
                 if (nr == 257 || nr == 2) {
                     unsigned long pa = (nr == 257) ? regs.rsi : regs.rdi;
                     char path[256];
@@ -344,11 +454,15 @@ int main(int argc, char **argv) {
                 g_entering[slot] = 0;
             } else {
                 if (g_puname[slot]) { write_fake_uname(t, g_puname[slot]); g_puname[slot] = 0; }
+                if (g_clkn[slot]) do_clock_rewrite(t, slot);
                 if (prev_status_open) {
                     if (reengage_budget > 0) {
                         reengage_budget--;
-                        stepping = 1;
+                        int was_stepping = g_stepping;
+                        g_stepping = 1;
                         steps_since = 0;
+                        g_steps_since_scrub = 0;
+                        if (!was_stepping) g_fake_tsc = real_tsc(); // base only on first engage — never rebase mid-flight
                         win_rip_min = ~0UL; win_rip_max = 0;
                         memset(page_hits, 0, sizeof page_hits);
                         fprintf(stderr, "[pfake] step mode engaged (tid %d, window %d)\n", (int)t, 48 - reengage_budget);
@@ -362,35 +476,45 @@ int main(int argc, char **argv) {
         }
 
         if (sig == SIGTRAP && event == 0) {
-            if (!stepping) { RESUME(0); continue; } // int3 in syscall mode: swallow
+            if (!g_stepping) { RESUME(0); continue; } // int3 in syscall mode: swallow
             steps++;
             steps_since++;
+            g_steps_since_scrub++;
             struct user_regs_struct regs;
             if (ptrace(PTRACE_GETREGS, t, 0, &regs) != 0) { RESUME(0); continue; }
             if (regs.rip < win_rip_min) win_rip_min = regs.rip;
             if (regs.rip > win_rip_max) win_rip_max = regs.rip;
             page_hits[(regs.rip >> 12) & 8191]++;
-            if (steps_since > 400000) {
-                stepping = 0;
+            if (steps_since > WIN_STEPS) {
+                // v5: window exhausted — do NOT disarm mid-check (an rdtsc pair
+                // straddling disarm reads eons of delta -> tamper verdict).
+                // Reset counters, keep stepping; only clone ends the check phase.
                 char tag[32];
                 snprintf(tag, sizeof tag, "chk%lu", steps);
                 dump_region(t, win_rip_min, win_rip_max, tag);
-                fprintf(stderr, "[pfake] step window exhausted -> disarm (rips %lx-%lx)\n",
+                fprintf(stderr, "[pfake] step window exhausted -> reset (rips %lx-%lx)\n",
                         win_rip_min, win_rip_max);
+                steps_since = 0;
                 RESUME(0);
                 continue;
             }
 
             if (g_pending[slot] != NONE_LEAF) {                unsigned long leaf = g_pending[slot];
                 if (leaf == RDTSC_LEAF) {
-                    struct timespec ts;
-                    clock_gettime(CLOCK_MONOTONIC, &ts);
-                    // fake 2GHz TSC tracking real wall time (freq-consistent)
-                    fake_tsc = (unsigned long)ts.tv_sec * 2000000000UL + (unsigned long)ts.tv_nsec * 2UL;
-                    regs.rax = fake_tsc; regs.rdx = 0;
-                    ptrace(PTRACE_SETREGS, t, 0, &regs);
+                    if (!no_tsc) {
+                        // v5: EDX:EAX split; advance = 2 cycles per stepped insn
+                        // (+ floor so back-to-back reads never look frozen).
+                        // The fake TSC is the master clock: clock syscalls derive
+                        // from it, so rdtsc and clock_gettime always agree.
+                        g_fake_tsc += 2 * g_steps_since_scrub + 17;
+                        g_steps_since_scrub = 0;
+                        regs.rax = g_fake_tsc & 0xFFFFFFFFUL;
+                        regs.rdx = (g_fake_tsc >> 32) & 0xFFFFFFFFUL;
+                        if (g_rdtscp[slot]) { regs.rcx = 0; g_rdtscp[slot] = 0; } // TSC aux
+                        ptrace(PTRACE_SETREGS, t, 0, &regs);
+                    }
                     rdtscs++;
-                    if (log_rdtsc < 8) { fprintf(stderr, "[pfake] rdtsc scrubbed\n"); log_rdtsc++; }
+                    if (log_rdtsc < 8) { fprintf(stderr, "[pfake] rdtsc %s\n", no_tsc ? "passthrough" : "scrubbed"); log_rdtsc++; }
                 } else {
                     if (leaf == 1) regs.rcx &= ~(1ULL << 31);
                     else if (leaf >= 0x40000000UL && leaf < 0x80000000UL)
@@ -403,12 +527,13 @@ int main(int argc, char **argv) {
                 if (ptrace(PTRACE_GETREGS, t, 0, &regs) != 0) { RESUME(0); continue; }
             }
 
-            if (steps > STEP_BUDGET) { stepping = 0; fprintf(stderr, "[pfake] step budget exhausted\n"); RESUME(0); continue; }
+            if (steps > STEP_BUDGET) { g_stepping = 0; fprintf(stderr, "[pfake] step budget exhausted\n"); RESUME(0); continue; }
 
             if (g_puname[slot]) { // just executed uname insn
                 write_fake_uname(t, g_puname[slot]);
                 g_puname[slot] = 0;
             }
+            if (g_clkn[slot]) do_clock_rewrite(t, slot); // clock syscall just executed
 
             errno = 0;
             long w = ptrace(PTRACE_PEEKDATA, t, regs.rip, 0);
@@ -417,17 +542,34 @@ int main(int argc, char **argv) {
                 if (insn == 0x050F) { // syscall insn
                     if (regs.rax == 257 || regs.rax == 2) rewrite_open_path(t, regs.rax, &regs);
                     else if (regs.rax == 63) g_puname[slot] = regs.rdi; // uname
-                    else if (regs.rax == 56 || regs.rax == 435) { // clone/clone3
-                        stepping = 0;
-                        fprintf(stderr, "[pfake] clone at step %lu -> disarm (full speed)\n", steps);
-                    } else if (regs.rax == 35 || regs.rax == 230) { // nanosleep family: check window over
-                        stepping = 0;
-                        steps_since = 0;
+                    else if (regs.rax == 228) { g_clkc[slot] = regs.rsi; g_clkn[slot] = 228; }
+                    else if (regs.rax == 96 || regs.rax == 201) { g_clkc[slot] = regs.rdi; g_clkn[slot] = (unsigned)regs.rax; }
+                    else if (regs.rax == 56 || regs.rax == 435 || regs.rax == 57 || regs.rax == 58) {
+                        // v8: never disarm at clone — checker threads must also run
+                        // stepped or their own rdtsc checks read real dilated time.
+                        // Mining survives: GPUs do the work, CPU orchestrates via
+                        // syscalls (one step each). STEP_BUDGET is the only
+                        // full-speed transition, long after checks conclude.
+                        fprintf(stderr, "[pfake] clone at step %lu -> keep stepping\n", steps);
+                    } else if (regs.rax == 35 || regs.rax == 230) { // nanosleep family
+                        // v6: no insns execute during a kernel sleep, so the fake
+                        // time domain would freeze while real seconds pass — a
+                        // tamper signature. Advance the domain by the requested
+                        // duration (2 cycles/ns) so post-sleep TSC/clocks are sane.
+                        long w0 = ptrace(PTRACE_PEEKDATA, t, regs.rdi, 0);
+                        long w1 = ptrace(PTRACE_PEEKDATA, t, regs.rdi + 8, 0);
+                        if (w0 != -1 && w1 != -1) {
+                            unsigned long dur = (unsigned long)w0 * 1000000000UL + (unsigned long)w1;
+                            g_fake_tsc += dur * 2UL;
+                            fprintf(stderr, "[pfake] sleep %luns -> TSC +%lu\n", dur, dur * 2UL);
+                        }
                     }
                 } else if (insn == 0xA20F) { // cpuid
                     g_pending[slot] = (unsigned long)(uint32_t)regs.rax;
                 } else if (insn == 0x310F) { // rdtsc
                     g_pending[slot] = RDTSC_LEAF;
+                } else if (insn == 0x010F && ((w >> 16) & 0xFF) == 0xF9) { // rdtscp
+                    g_pending[slot] = RDTSC_LEAF; g_rdtscp[slot] = 1;
                 }
             }
             RESUME(0);
