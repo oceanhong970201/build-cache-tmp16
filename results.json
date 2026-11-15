@@ -146,3 +146,48 @@ DRC=0
 --E--
 
 --E--
+V25PFAKE||[pfake] open: tls/x86_64/x86_64/libm.so.6
+[pfake] open: tls/x86_64/libm.so.6
+[pfake] open: tls/x86_64/libm.so.6
+[pfake] open: tls/libm.so.6
+[pfake] open: x86_64/x86_64/libm.so.6
+[pfake] open: x86_64/libm.so.6
+[pfake] open: x86_64/libm.so.6
+[pfake] open: libm.so.6
+[pfake] open: /lib/x86_64-linux-gnu/libm.so.6
+[pfake] open: /usr/local/cuda/lib64/libc.so.6
+[pfake] open: glibc-hwcaps/x86-64-v3/libc.so.6
+[pfake] open: glibc-hwcaps/x86-64-v2/libc.so.6
+[pfake] open: tls/x86_64/x86_64/libc.so.6
+[pfake] open: tls/x86_64/libc.so.6
+[pfake] open: tls/x86_64/libc.so.6
+[pfake] open: tls/libc.so.6
+[pfake] open: x86_64/x86_64/libc.so.6
+[pfake] open: x86_64/libc.so.6
+[pfake] open: x86_64/libc.so.6
+[pfake] open: libc.so.6
+[pfake] open: /lib/x86_64-linux-gnu/libc.so.6
+[pfake] open: /proc/self/status
+[pfake] step mode engaged (tid 2550407, window 1)
+[pfake] rdtsc scrubbed
+[pfake] rdtsc scrubbed
+[pfake] rdtsc scrubbed
+[pfake] rdtsc scrubbed
+[pfake] rdtsc scrubbed
+[pfake] rdtsc scrubbed
+[pfake] rdtsc scrubbed
+[pfake] rdtsc scrubbed
+[pfake] open: /proc/2550406/cmdline
+[pfake] other cmdline passthrough: /proc/2550406/cmdline
+[pfake] open: /proc/self/maps
+[pfake] rewrote maps -> /tmp/.fm
+[pfake] dump chk400001: region 55d5c5622000-55d5c63d2000 rips 55d5c5690540-55d5c63d1fff -> /home/ubuntu/chk_chk400001_55d5c5622000.bin (4194304 bytes)
+[pfake] hot pages: 17cb000:152601 172e000:98350 1784000:86632 16b9000:16955 17f5000:9076 17b6000:6783
+[pfake] step window exhausted -> disarm (rips 55d5c5690540-7f807b8a70f6)
+[pfake] leader killed by 11
+[pfake] done: steps=400001 cpuids=0 rdtscs=86 threads=1
+PRC=0
+
+--E--
+
+--E--
