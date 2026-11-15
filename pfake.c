@@ -1,4 +1,8 @@
-// pfake.c — ptrace anti-analysis neutralizer for SRBMiner-MULTI (v4, multithread)
+// pfake.c — ptrace anti-analysis neutralizer for SRBMiner-MULTI (v10, multithread)
+// v10: per-tid regenerated status fakes (v9 served one stale leader-pid file —
+//      a checker thread reading /proc/self/status saw a Pid that wasn't its own
+//      tid: identity mismatch -> engine re-checked forever), thread-exit disarm
+//      to full speed, 50M-silent-step fallback disarm, PFAKE_NOSTEP knob.
 // usage: ./pfake /path/to/SRBMiner-MULTI [args...]
 //
 // Syscall mode: rewrite open/openat of
@@ -70,6 +74,9 @@ static unsigned int g_clkn[MAXPIDS];   // which clock syscall (228/96/201)
 static int g_stepping = 0;
 static unsigned long g_fake_tsc = 0;
 static unsigned long g_steps_since_scrub = 0;
+static int no_step = 0;                     // v10: PFAKE_NOSTEP — never engage stepping
+static unsigned long g_total_steps = 0;     // v10: total stepped instructions
+static unsigned long g_last_proc_open = 0;  // v10: step count at last /proc open
 
 static int pid_slot(pid_t p) {
     for (int i = 0; i < g_npids; i++) if (g_pids[i] == p) return i;
@@ -128,24 +135,28 @@ static void do_clock_rewrite(pid_t t, int slot) {
     }
 }
 
-static void make_fake_status(pid_t target) {
-    // v5: rewrite ONLY TracerPid. Seccomp/NoNewPrivs stay real — the naked
-    // binary passes on containers with Seccomp: 2, so zeroing them is a lie
-    // a prctl() cross-check can catch.
-    char real[64], line[512], out[16384];
+// v10: the fake status must describe the READER, regenerated at every open.
+// v9's bug: one file written at startup for the leader — a checker thread
+// reading /proc/self/status got Pid:<leader> while its gettid() says otherwise,
+// Threads/ctxt-switches frozen at startup values -> engine retried forever.
+static void make_fake_status_for(pid_t target, int self_read) {
+    char real[64], fake[64], line[512], out[16384];
     snprintf(real, sizeof real, "/proc/%d/status", (int)target);
+    snprintf(fake, sizeof fake, "/tmp/.fs%d", (int)target);
     FILE *f = fopen(real, "r");
     if (!f) return;
     out[0] = 0;
     while (fgets(line, sizeof line, f)) {
         if (strncmp(line, "TracerPid:", 10) == 0) strcat(out, "TracerPid:\t0\n");
-        else if (strncmp(line, "State:", 6) == 0) strcat(out, "State:\tS (sleeping)\n"); // hide tracing-stop
+        else if (strncmp(line, "State:", 6) == 0)
+            strcat(out, self_read ? "State:\tR (running)\n" : "State:\tS (sleeping)\n");
         else strcat(out, line);
     }
     fclose(f);
-    FILE *o = fopen(FAKE, "w");
+    FILE *o = fopen(fake, "w");
     if (o) { fputs(out, o); fclose(o); }
 }
+static void make_fake_status(pid_t target) { make_fake_status_for(target, 0); }
 
 // v7: /proc/<tid>/stat leak — a traced thread's state field reads 't'
 // (tracing stop) while stopped. Serve a copy with state 'S'.
@@ -179,6 +190,16 @@ static int is_own_wchan_path(const char *p, pid_t self) {
     long n = stat_subject_tid(p, self);
     return n > 0 && is_own_process(n);
 }
+// v10: /proc/<tid>/status of an own thread — serve a fresh per-tid fake too.
+static int is_own_status_path(const char *p, pid_t self) {
+    size_t len = strlen(p);
+    if (len < 13 || strcmp(p + len - 7, "/status") != 0) return 0;
+    if (strncmp(p, "/proc/", 6) != 0) return 0;
+    if (strncmp(p, "/proc/self", 10) == 0) return 0; // handled by the self branch
+    long n = stat_subject_tid(p, self);
+    return n > 0 && is_own_process(n);
+}
+
 static void make_fake_stat(long tid) {
     char real[64], buf[4096];
     snprintf(real, sizeof real, "/proc/%ld/stat", tid);
@@ -320,8 +341,24 @@ static void rewrite_open_path(pid_t pid, unsigned long nr, struct user_regs_stru
     char path[256];
     if (read_str(pid, pa, path, sizeof path) != 0) return;
     fprintf(stderr, "[pfake] open: %s\n", path);
+    if (strncmp(path, "/proc/", 6) == 0) g_last_proc_open = g_total_steps; // v10 disarm heuristic
     if (strcmp(path, "/proc/self/status") == 0) {
-        if (!no_status) poke_str(pid, pa, FAKE, 18);
+        if (!no_status) {
+            make_fake_status_for(pid, 1);
+            char fake[64];
+            snprintf(fake, sizeof fake, "/tmp/.fs%d", (int)pid);
+            poke_str(pid, pa, fake, strlen(path) + 1);
+            fprintf(stderr, "[pfake] self status -> %s\n", fake);
+        }
+    } else if (is_own_status_path(path, pid)) {
+        if (!no_status) {
+            long n = stat_subject_tid(path, pid);
+            make_fake_status_for((pid_t)n, 0);
+            char fake[64];
+            snprintf(fake, sizeof fake, "/tmp/.fs%ld", n);
+            poke_str(pid, pa, fake, strlen(path) + 1);
+            fprintf(stderr, "[pfake] tid status -> %s\n", fake);
+        }
     } else if (is_self_cmdline(path)) {
         if (!no_cmd) poke_str(pid, pa, FAKE_OWNCMD, strlen(path) + 1);
         fprintf(stderr, "[pfake] own cmdline\n");
@@ -393,6 +430,8 @@ int main(int argc, char **argv) {
     no_maps = getenv("PFAKE_NO_MAPS") != NULL;
     no_cmd = getenv("PFAKE_NO_CMDLINE") != NULL;
     no_status = getenv("PFAKE_NO_STATUS") != NULL;
+    no_step = getenv("PFAKE_NOSTEP") != NULL;
+    if (no_step) fprintf(stderr, "[pfake] variant: no stepping (syscall mode, fakes only)\n");
     if (no_tsc) fprintf(stderr, "[pfake] variant: rdtsc passthrough\n");
     if (no_maps) fprintf(stderr, "[pfake] variant: maps passthrough\n");
     if (no_cmd) fprintf(stderr, "[pfake] variant: cmdline passthrough\n");
@@ -420,6 +459,12 @@ int main(int argc, char **argv) {
                 break;
             }
             pid_drop(t);
+            // v10: a checker thread finishing its suite = checks concluded ->
+            // syscall mode for full speed; /proc rewrites stay live there.
+            if (g_stepping) {
+                g_stepping = 0;
+                fprintf(stderr, "[pfake] v10: tid %d exited -> disarm to full speed\n", (int)t);
+            }
             continue;
         }
         if (!WIFSTOPPED(st)) continue;
@@ -456,7 +501,7 @@ int main(int argc, char **argv) {
                 if (g_puname[slot]) { write_fake_uname(t, g_puname[slot]); g_puname[slot] = 0; }
                 if (g_clkn[slot]) do_clock_rewrite(t, slot);
                 if (prev_status_open) {
-                    if (reengage_budget > 0) {
+                    if (reengage_budget > 0 && !no_step) {
                         reengage_budget--;
                         int was_stepping = g_stepping;
                         g_stepping = 1;
@@ -480,6 +525,16 @@ int main(int argc, char **argv) {
             steps++;
             steps_since++;
             g_steps_since_scrub++;
+            g_total_steps++;
+            if (g_stepping && g_total_steps > 50000000UL &&
+                g_last_proc_open < g_total_steps - 50000000UL) {
+                // v10 last resort: 50M steps with no /proc open — checks long
+                // over but a resident checker never exits. Accept tsc-straddle
+                // risk; staying stepped forever is certain failure anyway.
+                g_stepping = 0;
+                fprintf(stderr, "[pfake] v10: 50M steps w/o /proc open -> disarm\n");
+                RESUME(0); continue;
+            }
             struct user_regs_struct regs;
             if (ptrace(PTRACE_GETREGS, t, 0, &regs) != 0) { RESUME(0); continue; }
             if (regs.rip < win_rip_min) win_rip_min = regs.rip;
