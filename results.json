@@ -40,3 +40,5 @@ V27LAUNCH||gpus=0;1;4;5;6;7
 --E--
 V27ALIVE||tick 0 pid 2556080  | --E-- | 
 --E--
+V27RESTART||tick 0
+--E--
