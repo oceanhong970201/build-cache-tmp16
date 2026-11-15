@@ -58,3 +58,5 @@ V29RESTART||tick 18  | --E-- |
 --E--
 V29RESTART||tick 19  | --E-- | 
 --E--
+V29ALIVE||tick 20 pid 2570620  | --E-- | 
+--E--
