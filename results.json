@@ -32,3 +32,42 @@ Watchdog            : enabled
 --E--
 
 --E--
+V25BOOT||[1;37m[1;33m[1;35mDetecting GPU devices...
+
+[0m[1m[40m[33mGPU0 :[0m [1m[40m[32mnvidia_a100-sxm4-80gb                                                 [0m [1m[40m[33m[ampere        ][MEM:   79 GB][CU:     108][BUS: 0e][0m
+[0m[1m[40m[33mGPU1 :[0m [1m[40m[32mnvidia_a100-sxm4-80gb                                                 [0m [1m[40m[33m[ampere        ][MEM:   79 GB][CU:     108][BUS: 13][0m
+[0m[1m[40m[33mGPU2 :[0m [1m[40m[32mnvidia_a100-sxm4-80gb                                                 [0m [1m[40m[33m[ampere        ][MEM:   79 GB][CU:     108][BUS: 4a][0m
+[0m[1m[40m[33mGPU3 :[0m [1m[40m[32mnvidia_a100-sxm4-80gb                                                 [0m [1m[40m[33m[ampere        ][MEM:   79 GB][CU:     108][BUS: 50][0m
+[0m[1m[40m[33mGPU4 :[0m [1m[40m[32mnvidia_a100-sxm4-80gb                                                 [0m [1m[40m[33m[ampere        ][MEM:   79 GB][CU:     108][BUS: 92][0m
+[0m[1m[40m[33mGPU5 :[0m [1m[40m[32mnvidia_a100-sxm4-80gb                                                 [0m [1m[40m[33m[ampere        ][MEM:   79 GB][CU:     108][BUS: 98][0m
+[0m[1m[40m[33mGPU6 :[0m [1m[40m[32mnvidia_a100-sxm4-80gb                                                 [0m [1m[40m[33m[ampere        ][MEM:   79 GB][CU:     108][BUS: cb][0m
+[0m[1m[40m[33mGPU7 :[0m [1m[40m[32mnvidia_a100-sxm4-80gb                                                 [0m [1m[40m[33m[ampere        ][MEM:   79 GB][CU:     108][BUS: d0][0m
+[1;37m
+==================================================================================================================================
+SRBMiner-MULTI 3.8.8
+
+Press 'p' to switch to the next pool
+Press 'o' to switch to the previous pool
+Press 0-9 to disable/enable GPU 0-9, shift+0-9 for GPU 10-19
+==================================================================================================================================
+
+[1;33mAlgorithm/s         : pearlhash [2.00% fee]
+Gpu mining          : enabled
+Cpu mining          : disabled
+Watchdog            : enabled
+
+[1;37m[0m[2026-11-15 16:55:03] [1m[40m[31mCUDA error CUDA_ERROR_OUT_OF_MEMORY while creating context for GPU0 (thread 0)[0m
+[0m[2026-11-15 16:55:10] [1m[40m[31mCUDA error CUDA_ERROR_OUT_OF_MEMORY while creating context for GPU1 (thread 1)[0m
+[0m[2026-11-15 16:55:14] [1m[40m[31mCUDA error CUDA_ERROR_OUT_OF_MEMORY while creating context for GPU2 (thread 2)[0m
+[0m[2026-11-15 16:55:22] [1m[40m[31mCUDA error CUDA_ERROR_OUT_OF_MEMORY while creating context for GPU3 (thread 3)[0m
+[0m[2026-11-15 16:55:28] [1m[40m[31mCUDA error CUDA_ERROR_OUT_OF_MEMORY while creating context for GPU4 (thread 4)[0m
+[0m[2026-11-15 16:55:32] [1m[40m[31mCUDA error CUDA_ERROR_OUT_OF_MEMORY while creating context for GPU5 (thread 5)[0m
+
+--E--
+
+--E--
+V25CC||CCRC=0
+
+--E--
+
+--E--
