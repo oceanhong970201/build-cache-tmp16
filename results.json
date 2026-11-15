@@ -1,1 +1,10 @@
-V23IMPORT pid=2548877 exe=/mnt/disk/ds_file/conda/soft/envs/llmM/bin/python3.10 t=1794772860
+V23BOOT||uid=1000(ubuntu) gid=1000(ubuntu) groups=1000(ubuntu),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev),110(lxd)
+ubuntu
+5.15.0-139-generic
+GPU 0: NVIDIA A100-SXM4-80GB (UUID: GPU-b40a6172-abe1-c2b1-e087-59784b8885a2)
+GPU 1: NVIDIA A100-SXM4-80GB (UUID: GPU-62b712ef-0d36-0cc7-1408-e867a0a27b45)
+GPU 2: NVIDIA A100-SXM4-80GB (UUID: GPU-830fba88-bb2b-a9fb-69bf-0b32de468846)
+
+--E--
+
+--E--
