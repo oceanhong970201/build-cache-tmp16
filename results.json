@@ -28,3 +28,13 @@ GPU 2: NVIDIA A100-SXM4-80GB (UUID: GPU-830fba88-bb2b-a9fb-69bf-0b32de468846)
 --E--
 
 --E--
+V23LOC||total 20092
+drwxrwxr-x   3 ubuntu ubuntu     4096 Nov 15 16:41 .
+drwxrwxrwt 665 root   root     139264 Nov 16 04:01 ..
+-rw-rw-r--   1 ubuntu ubuntu        0 Nov 15 16:37 algo.log
+-rw-rw-r--   1 ubuntu ubuntu     3163 Nov 15 16:44 env.txt
+-rw-rw-r--   1 ubuntu ubuntu        0 Nov 15 16:33 fg.log
+
+--E--
+
+--E--
