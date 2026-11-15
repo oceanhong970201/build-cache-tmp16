@@ -96,3 +96,7 @@ V24GPU||0, 3305 MiB, 0 %
 --E--
 V24FREE||none
 --E--
+V24NOFREE
+--E--
+V24FREE||none
+--E--
