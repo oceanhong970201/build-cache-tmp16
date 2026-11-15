@@ -40,3 +40,5 @@ V28LAUNCH||gpus=0;1;4;5;6;7
 --E--
 V28ALIVE||tick 0 pid 2557496  | --E-- | 
 --E--
+V28RESTART||tick 0
+--E--
