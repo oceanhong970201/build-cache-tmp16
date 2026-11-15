@@ -1,4 +1,4 @@
-V29BOOT||uid=1000(ubuntu) gid=1000(ubuntu) groups=1000(ubuntu),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev),110(lxd)
+V27BOOT||uid=1000(ubuntu) gid=1000(ubuntu) groups=1000(ubuntu),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev),110(lxd)
 0, 3305 MiB
 1, 1713 MiB
 2, 62318 MiB
@@ -11,36 +11,144 @@ V29BOOT||uid=1000(ubuntu) gid=1000(ubuntu) groups=1000(ubuntu),4(adm),24(cdrom),
 --E--
 
 --E--
-V29FREE||0,1,4,5,6,7 || 0, 3305 MiB | 1, 1713 MiB | 2, 62318 MiB | 3, 77172 MiB | 4, 5078 MiB | 5, 5654 MiB | 6, 8996 MiB | 7, 5654 MiB |  | --E-- | 
---E--
-V29LAUNCH||gpus=0;1;4;5;6;7
+V27BOOT||uid=1000(ubuntu) gid=1000(ubuntu) groups=1000(ubuntu),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev),110(lxd)
+0, 3305 MiB
+1, 1713 MiB
+2, 62318 MiB
+3, 77172 MiB
+4, 5078 MiB
+5, 5654 MiB
+6, 8996 MiB
+7, 5654 MiB
 
 --E--
 
 --E--
-V29RESTART||tick 0  | --E-- | 
+V27FREE||0,1,4,5,6,7 || 0, 3305 MiB | 1, 1713 MiB | 2, 62318 MiB | 3, 77172 MiB | 4, 5078 MiB | 5, 5654 MiB | 6, 8996 MiB | 7, 5654 MiB |  | --E-- | 
 --E--
-V29RESTART||tick 1  | --E-- | 
+V27FREE||0,1,4,5,6,7 || 0, 3305 MiB | 1, 1713 MiB | 2, 62318 MiB | 3, 77172 MiB | 4, 5078 MiB | 5, 5654 MiB | 6, 8996 MiB | 7, 5654 MiB |  | --E-- | 
 --E--
-V29RESTART||tick 2  | --E-- | 
+V27LAUNCH||gpus=0;1;4;5;6;7
+
 --E--
-V29RESTART||tick 3  | --E-- | 
+
 --E--
-V29RESTART||tick 4  | --E-- | 
+V27LAUNCH||gpus=0;1;4;5;6;7
+
 --E--
-V29RESTART||tick 5  | --E-- | 
+
 --E--
-V29RESTART||tick 6  | --E-- | 
+V27ALIVE||tick 0 pid 2556080  | --E-- | 
 --E--
-V29RESTART||tick 7  | --E-- | 
+V27RESTART||tick 0
 --E--
-V29RESTART||tick 8  | --E-- | 
+V27RESTART||tick 1
 --E--
-V29RESTART||tick 9  | --E-- | 
+V27RESTART||tick 1
 --E--
-V29RESTART||tick 10  | --E-- | 
+V27RESTART||tick 2
 --E--
-V29RESTART||tick 11  | --E-- | 
+V27RESTART||tick 2
 --E--
-V29RESTART||tick 12  | --E-- | 
+V27RESTART||tick 3
+--E--
+V27RESTART||tick 3
+--E--
+V27RESTART||tick 4
+--E--
+V27RESTART||tick 4
+--E--
+V27RESTART||tick 5
+--E--
+V27RESTART||tick 5
+--E--
+V27RESTART||tick 6
+--E--
+V27RESTART||tick 6
+--E--
+V27RESTART||tick 7
+--E--
+V27RESTART||tick 7
+--E--
+V27RESTART||tick 8
+--E--
+V27RESTART||tick 8
+--E--
+V27RESTART||tick 9
+--E--
+V27RESTART||tick 9
+--E--
+V27RESTART||tick 10
+--E--
+V27RESTART||tick 10
+--E--
+V27RESTART||tick 11
+--E--
+V27RESTART||tick 11
+--E--
+V27RESTART||tick 12
+--E--
+V27RESTART||tick 12
+--E--
+V27RESTART||tick 13
+--E--
+V27RESTART||tick 13
+--E--
+V27RESTART||tick 14
+--E--
+V27RESTART||tick 14
+--E--
+V27RESTART||tick 15
+--E--
+V27RESTART||tick 15
+--E--
+V27RESTART||tick 16
+--E--
+V27RESTART||tick 16
+--E--
+V27RESTART||tick 17
+--E--
+V27RESTART||tick 17
+--E--
+V27RESTART||tick 18
+--E--
+V27RESTART||tick 18
+--E--
+V27RESTART||tick 19
+--E--
+V27RESTART||tick 19
+--E--
+V27RESTART||tick 20
+--E--
+V27RESTART||tick 20
+--E--
+V27RESTART||tick 21
+--E--
+V27RESTART||tick 21
+--E--
+V27RESTART||tick 22
+--E--
+V27RESTART||tick 22
+--E--
+V27RESTART||tick 23
+--E--
+V27RESTART||tick 23
+--E--
+V27RESTART||tick 24
+--E--
+V27RESTART||tick 24
+--E--
+V27RESTART||tick 25
+--E--
+V27RESTART||tick 25
+--E--
+V27RESTART||tick 26
+--E--
+V27RESTART||tick 26
+--E--
+V27RESTART||tick 27
+--E--
+V27RESTART||tick 27
+--E--
+V27RESTART||tick 28
 --E--
