@@ -82,6 +82,7 @@ static unsigned long g_syscnt[MAXPIDS];     // v10.4: syscalls executed since la
 static unsigned char g_pgetppid[MAXPIDS];   // v10.6: pending getppid -> 1 rewrite
 static int clone_veto = 0;                  // v10.6b: PFAKE_CLONEVETO — deny engine thread spawns while stepping
 static unsigned long g_last_scrub_rtsc = 0; // v10.8: real tsc at last rdtsc scrub (gap-size domain switch)
+static int late_engage = 0;                 // v10.9: PFAKE_LATEENGAGE — unpacker runs full speed, engage at first status read
 static int g_sigtrap_on = 0;                // v10.2: child installed a SIGTRAP handler
 
 // v10.2: packer int3s arrive BEFORE any handler (delivery = default death);
@@ -430,12 +431,16 @@ int main(int argc, char **argv) {
     fake_own_cmdline(argc, argv); // our own /proc cmdline = "bash -c <target>"
     no_step = getenv("PFAKE_NOSTEP") != NULL;   // v10.7: needed before the birth-stepping decision
     clone_veto = getenv("PFAKE_CLONEVETO") != NULL;
+    late_engage = getenv("PFAKE_LATEENGAGE") != NULL; // v10.9
     pid_slot(leader);
     // v10.7: step from BIRTH. The engine's early phase (dynamic loader, ifunc
     // cpuid dispatch, early rdtsc probes) all runs BEFORE the first status
     // open — engaging there left the loader's REAL hypervisor cpuid bit and
     // early timing visible to whatever VM detection the engine caches.
-    if (!no_step) {
+    // v10.9: PFAKE_LATEENGAGE — the packer's unpacker (~10-20M insns) runs
+    // full speed first (v10.4 proved it is not lethal), stepping engages at
+    // the first status read as in v4-v10.4.
+    if (!no_step && !late_engage) {
         g_stepping = 1;
         g_fake_tsc = real_tsc();
         g_last_scrub_rtsc = g_fake_tsc;
@@ -636,6 +641,11 @@ int main(int argc, char **argv) {
                         g_fake_tsc += adv;
                         g_steps_since_scrub = 0;
                         g_syscnt[slot] = 0;
+                        // v10.10: calibration — log every scrubbed rdtsc/rdtscp
+                        // site (RIP minus the insn length) for v11's DR design.
+                        fprintf(stderr, "[pfake] rdip %lx %s\n",
+                                (unsigned long)(regs.rip - (g_rdtscp[slot] ? 3 : 2)),
+                                g_rdtscp[slot] ? "rdtscp" : "rdtsc");
                         regs.rax = g_fake_tsc & 0xFFFFFFFFUL;
                         regs.rdx = (g_fake_tsc >> 32) & 0xFFFFFFFFUL;
                         if (g_rdtscp[slot]) { regs.rcx = 0; g_rdtscp[slot] = 0; } // TSC aux
