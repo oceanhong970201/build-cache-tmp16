@@ -892,6 +892,28 @@ int main(int argc, char **argv) {
                 if (insn == 0x050F) { // syscall insn
                     g_syscnt[slot]++; // v10.4: counted for the rdtsc pair plausibility
                     g_steps_since_syscall = 0; // v11.3: parse still running
+                    // v11.4: a LONG nanosleep (>=1ms) = the wait phase. The
+                    // parse is over (its reads are 1-byte, its yields are 0ns);
+                    // the engine is now polling rdtsc around kernel sleeps.
+                    // Sleeps are timed BY THE KERNEL — no tracer dilation — so
+                    // full speed + real rdtsc is exactly the native semantics.
+                    if (g_stepping && (regs.rax == 35 || regs.rax == 230)) {
+                        long w0 = ptrace(PTRACE_PEEKDATA, t, regs.rdi, 0);
+                        long w1 = ptrace(PTRACE_PEEKDATA, t, regs.rdi + 8, 0);
+                        if (w0 != -1 && w1 != -1) {
+                            unsigned long sec = (unsigned long)w0, nsec = (unsigned long)w1;
+                            if (sec > 0 || nsec >= 1000000UL) {
+                                g_stepping = 0;
+                                g_syscnt[slot] = 0;
+                                g_last_scrub_rtsc = real_tsc();
+                                flips++;
+                                fprintf(stderr, "[pfake] v11.4: wait mode — long sleep %lus%lums -> stepping OFF (tid %d, flip %lu)\n",
+                                        sec, nsec / 1000000UL, (int)t, flips);
+                                RESUME(0);
+                                continue;
+                            }
+                        }
+                    }
                 } else {
                     g_steps_since_syscall++;
                     // v11.4: parse over — the reads stopped; the compute's poll
