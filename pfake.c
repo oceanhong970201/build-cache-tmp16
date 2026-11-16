@@ -32,6 +32,7 @@
 #include <sys/user.h>
 #include <sys/reg.h>
 #include <sys/prctl.h>
+#include <stddef.h>
 
 #define FAKE "/tmp/.fakestatus"
 #define FAKE_CMD "/tmp/.fc"      // parent/tracer cmdline: "bash"
@@ -85,6 +86,28 @@ static unsigned long g_last_scrub_rtsc = 0; // v10.8: real tsc at last rdtsc scr
 static int late_engage = 0;                 // v10.9: PFAKE_LATEENGAGE — unpacker runs full speed, engage at first status read
 static int g_sigtrap_on = 0;                // v10.2: child installed a SIGTRAP handler
 
+// ---- v11: DR-breakpoint mode ----
+// Calibrate rdtsc/rdtscp sites while stepping, then drop stepping and arm
+// hardware execute breakpoints (DR0-3) on the hot sites. From then on the
+// engine runs at full speed under PTRACE_SYSCALL; each rdtsc traps once,
+// is emulated with the fake-domain value, and execution skips the insn.
+// The engine never executes a real rdtsc again, and the syscall-stop
+// dilation is subtracted out of the domain advance (what an untraced run
+// would have read), so timed pairs stay plausible.
+static int dr_mode = 0;                     // v11: DR breakpoints armed, stepping off
+static int use_dr = 0;                       // v11.4: PFAKE_DR=1 enables the v11.2 DR switch (default off — v11.4 mode)
+static int no_dr = 0;                       // v11: PFAKE_NODR=1 — stay stepped, never switch
+static unsigned long g_rd_sites[16];        // v11: calibrated rdtsc/rdtscp site addresses
+static int g_rd_kind[16];                   // 0 = rdtsc (2B), 1 = rdtscp (3B)
+static int g_nrd = 0;
+static int g_rd_events = 0;                 // total scrubbed rdtsc events seen
+static int g_rd_lastnew = 0;                // event index at last NEW site
+static unsigned long g_rd_hits[16];         // v11: per-site hit count — arm the 4 hottest
+static unsigned long g_dil_per_sys = 150000UL; // v11: cycles of tracer dilation per syscall stop
+static int g_post_switch_dumps = 0;           // v11: debug — first stops after the DR switch
+static unsigned long g_steps_since_syscall = 0; // v11.3: steps since last syscall insn (parse-over detector)
+
+
 // v10.2: packer int3s arrive BEFORE any handler (delivery = default death);
 // engine canary int3s arrive after rt_sigaction(SIGTRAP, real_handler).
 static void note_sigaction(pid_t t, unsigned long signum, unsigned long act) {
@@ -93,6 +116,84 @@ static void note_sigaction(pid_t t, unsigned long signum, unsigned long act) {
     long h = ptrace(PTRACE_PEEKDATA, t, act, 0);
     if (errno != 0) return;
     g_sigtrap_on = !(h == 0 || h == 1); // SIG_DFL / SIG_IGN don't count
+}
+
+// ---- v11: DR-breakpoint machinery ----
+#define DR_OFF(n) (offsetof(struct user, u_debugreg[n]))
+
+// Arm up to 4 hardware execute breakpoints on the calibrated sites for one
+// thread. Sites are verified against the live instruction bytes first, so a
+// mismatched/ASLR-shifted address is skipped rather than mis-trapped.
+static void arm_dr_on(pid_t t) {
+    struct { unsigned long a; int kind; } pick[4];
+    int n = 0;
+    // pick the 4 HOTTEST sites (discovery order breaks ties)
+    for (int round = 0; round < 4 && n < 4; round++) {
+        int best = -1;
+        for (int i = 0; i < g_nrd; i++) {
+            if (g_rd_hits[i] == 0) continue;
+            int taken = 0;
+            for (int j = 0; j < n; j++) if (pick[j].a == g_rd_sites[i]) { taken = 1; break; }
+            if (taken) continue;
+            if (best < 0 || g_rd_hits[i] > g_rd_hits[best]) best = i;
+        }
+        if (best < 0) break;
+        errno = 0;
+        long w = ptrace(PTRACE_PEEKDATA, t, g_rd_sites[best], 0);
+        if (errno != 0) { g_rd_hits[best] = 0; continue; } // unmapped now: drop from candidates
+        uint16_t b = (uint16_t)(w & 0xFFFF);
+        int ok = (g_rd_kind[best] == 0 && b == 0x310F) ||
+                 (g_rd_kind[best] == 1 && b == 0x010F && (int)((w >> 16) & 0xFF) == 0xF9);
+        if (!ok) { g_rd_hits[best] = 0; continue; } // insn changed: drop
+        pick[n].a = g_rd_sites[best]; pick[n].kind = g_rd_kind[best]; n++;
+    }
+    if (n == 0) return;
+    unsigned long dr7 = 0x400; // bit 10 must stay 1 (reserved)
+    for (int i = 0; i < n; i++) {
+        long rc = ptrace(PTRACE_POKEUSER, t, (void *)DR_OFF(i), (void *)pick[i].a);
+        dr7 |= 1UL << i; // v11.2: LOCAL enable Li (bits 0-3). The GLOBAL bits
+        // (4-7) silently do not raise #DB under this Hyper-V/WSL kernel with
+        // ptrace-written DRs — L-bits verified firing via the drmim harness.
+        // Kernel context switch restores DR7 per thread (TIF_DEBUG), so L
+        // survives scheduling.
+        if (rc != 0)
+            fprintf(stderr, "[pfake] dr poke DR%d off=%ld FAILED rc=%ld errno=%d\n",
+                    i, (long)DR_OFF(i), rc, errno);
+        else
+            fprintf(stderr, "[pfake] armed DR%d tid %d site=%lx kind=%d\n",
+                    i, (int)t, pick[i].a, pick[i].kind);
+    }
+    long rc7 = ptrace(PTRACE_POKEUSER, t, (void *)DR_OFF(7), (void *)dr7);
+    long rb0 = ptrace(PTRACE_PEEKUSER, t, (void *)DR_OFF(0), 0);
+    long rb7 = ptrace(PTRACE_PEEKUSER, t, (void *)DR_OFF(7), 0);
+    fprintf(stderr, "[pfake] dr7 poke rc=%ld readback dr0=%lx dr7=%lx (want dr7=%lx)\n",
+            rc7, rb0, rb7, dr7);
+    if (rb7 == -1 && errno != 0) return;
+}
+
+// Record one scrubbed rdtsc site; fire the DR switch once the site set is
+// stable (60+ events, no new site in the last 25, or 400 events hard cap).
+static void record_rd_site(unsigned long site, int is_rdtscp, pid_t t, int slot) {
+    int known = 0;
+    for (int i = 0; i < g_nrd; i++) if (g_rd_sites[i] == site) { g_rd_hits[i]++; known = 1; break; }
+    if (!known && g_nrd < 16) {
+        g_rd_sites[g_nrd] = site;
+        g_rd_kind[g_nrd] = is_rdtscp;
+        g_rd_hits[g_nrd] = 1;
+        g_nrd++;
+        g_rd_lastnew = g_rd_events;
+    }
+    g_rd_events++;
+    if (!use_dr || no_dr || dr_mode || g_nrd == 0) return;
+    if (g_rd_events >= 60 && (unsigned)(g_rd_events - g_rd_lastnew) >= 25) {
+        dr_mode = 1;
+        g_stepping = 0;
+        g_last_scrub_rtsc = real_tsc();
+        g_syscnt[slot] = 0;
+        for (int i = 0; i < g_npids; i++) arm_dr_on(g_pids[i]);
+        fprintf(stderr, "[pfake] v11: DR mode engaged — %d sites, stepping OFF at event %d (tid %d)\n",
+                g_nrd, g_rd_events, (int)t);
+    }
 }
 
 static int pid_slot(pid_t p) {
@@ -120,7 +221,16 @@ static void write_fake_uname(pid_t pid, unsigned long addr) {
     strcpy(u.d, "(none)");
     for (size_t off = 0; off < sizeof u; off += sizeof(long)) {
         long w;
-        memcpy(&w, (char *)&u + off, sizeof w);
+        size_t chunk = sizeof u - off;
+        if (chunk >= sizeof(long)) {
+            memcpy(&w, (char *)&u + off, sizeof w);
+        } else { // v11.1: RMW tail word — never write past the utsname buffer
+            errno = 0;
+            long old = ptrace(PTRACE_PEEKDATA, pid, addr + off, 0);
+            if (errno != 0) return;
+            memcpy(&w, &old, sizeof w);
+            memcpy((char *)&w, (char *)&u + off, chunk);
+        }
         ptrace(PTRACE_POKEDATA, pid, addr + off, (void *)w);
     }
     fprintf(stderr, "[pfake] uname rewritten\n");
@@ -261,12 +371,31 @@ static int read_str(pid_t pid, unsigned long addr, char *buf, size_t max) {
     return 0;
 }
 static int poke_str(pid_t pid, unsigned long addr, const char *s, size_t cap) {
+    // v11.1: POKEDATA writes whole 8-byte words; the old loop rounded cap UP
+    // to a word and so smashed up to 7 NUL bytes PAST the target string's
+    // footprint into whatever .rodata/code followed it (fmt strings, engine
+    // constants — a wild variable in every run since v9). Now: write exactly
+    // strlen+1 bytes; the tail word is read-modify-write so nothing beyond
+    // the new string's own end is touched.
     char buf[64];
     memset(buf, 0, sizeof buf);
-    strncpy(buf, s, sizeof buf - 1);
-    for (size_t off = 0; off < cap; off += sizeof(long)) {
+    size_t len = strlen(s);
+    if (len >= sizeof buf) len = sizeof buf - 1;
+    memcpy(buf, s, len);
+    size_t need = len + 1; // string + NUL
+    if (need > cap) need = cap;
+    for (size_t off = 0; off < need; off += sizeof(long)) {
         long w;
-        memcpy(&w, buf + off, sizeof w);
+        size_t chunk = need - off;
+        if (chunk >= sizeof(long)) {
+            memcpy(&w, buf + off, sizeof w);
+        } else {
+            errno = 0;
+            long old = ptrace(PTRACE_PEEKDATA, pid, addr + off, 0);
+            if (errno != 0) return -1;
+            memcpy(&w, &old, sizeof w);
+            memcpy((char *)&w, buf + off, chunk);
+        }
         if (ptrace(PTRACE_POKEDATA, pid, addr + off, (void *)w) != 0) return -1;
     }
     return 0;
@@ -432,6 +561,9 @@ int main(int argc, char **argv) {
     no_step = getenv("PFAKE_NOSTEP") != NULL;   // v10.7: needed before the birth-stepping decision
     clone_veto = getenv("PFAKE_CLONEVETO") != NULL;
     late_engage = getenv("PFAKE_LATEENGAGE") != NULL; // v10.9
+    use_dr = getenv("PFAKE_DR") != NULL;      // v11.4: optional DR switch experiment
+    no_dr = getenv("PFAKE_NODR") != NULL;     // v11: stay stepped forever
+    { const char *d = getenv("PFAKE_DIL"); if (d) g_dil_per_sys = strtoul(d, 0, 0); }
     pid_slot(leader);
     // v10.7: step from BIRTH. The engine's early phase (dynamic loader, ifunc
     // cpuid dispatch, early rdtsc probes) all runs BEFORE the first status
@@ -449,7 +581,6 @@ int main(int argc, char **argv) {
     fprintf(stderr, "[pfake] child %d, fakes ready%s\n", (int)leader,
             g_stepping ? " (stepped from exec)" : "");
 
-    int reengage_budget = 512;
     // variant knobs: PFAKE_NO_TSC / PFAKE_NO_MAPS / PFAKE_NO_CMDLINE / PFAKE_NO_STATUS
     no_tsc = getenv("PFAKE_NO_TSC") != NULL;
     no_maps = getenv("PFAKE_NO_MAPS") != NULL;
@@ -460,11 +591,12 @@ int main(int argc, char **argv) {
     if (clone_veto) fprintf(stderr, "[pfake] variant: clone veto (checker spawns denied)\n");
     if (no_step) fprintf(stderr, "[pfake] variant: no stepping (syscall mode, fakes only)\n");
     if (no_tsc) fprintf(stderr, "[pfake] variant: rdtsc passthrough\n");
+    if (no_dr) fprintf(stderr, "[pfake] v11: DR switch disabled (stay stepped)\n");
     if (no_maps) fprintf(stderr, "[pfake] variant: maps passthrough\n");
     if (no_cmd) fprintf(stderr, "[pfake] variant: cmdline passthrough\n");
     if (no_status) fprintf(stderr, "[pfake] variant: status passthrough\n");
     unsigned long steps = 0, steps_since = 0, cpuids = 0, rdtscs = 0;
-    unsigned long log_cpuid = 0, log_rdtsc = 0;
+    unsigned long log_cpuid = 0, log_rdtsc = 0, engages = 0, flips = 0;
     int prev_status_open = 0;
 
     for (;;) {
@@ -500,8 +632,10 @@ int main(int argc, char **argv) {
 
         if (event == PTRACE_EVENT_CLONE || event == PTRACE_EVENT_FORK || event == PTRACE_EVENT_VFORK) {
             unsigned long msg;
-            if (ptrace(PTRACE_GETEVENTMSG, t, 0, &msg) == 0 && (pid_t)msg != t)
+            if (ptrace(PTRACE_GETEVENTMSG, t, 0, &msg) == 0 && (pid_t)msg != t) {
                 pid_slot((pid_t)msg); // pre-register; its first stop is swallowed below
+                if (dr_mode) arm_dr_on((pid_t)msg); // v11: cover new threads (best-effort)
+            }
             RESUME(0);
             continue;
         }
@@ -510,6 +644,7 @@ int main(int argc, char **argv) {
             struct user_regs_struct regs;
             if (ptrace(PTRACE_GETREGS, t, 0, &regs) != 0) { RESUME(0); continue; }
             if (g_entering[slot]) {
+                g_syscnt[slot]++; // v11: syscall stops since last scrub — dilation fuel
                 unsigned long nr = regs.orig_rax;
                 if (nr == 63) g_puname[slot] = regs.rdi; // uname: rewrite at exit
                 if (nr == 157 && (regs.rdi == 21 || regs.rdi == 39)) g_pprctl[slot] = 1; // v10.1: prctl GET_SECCOMP/NNP -> 0
@@ -522,7 +657,13 @@ int main(int argc, char **argv) {
                     unsigned long pa = (nr == 257) ? regs.rsi : regs.rdi;
                     char path[256];
                     prev_status_open = 0;
-                    if (pa && read_str(t, pa, path, sizeof path) == 0 && strcmp(path, "/proc/self/status") == 0)
+                    // v11.4: the /proc/self/status literal in the tracee is POKED
+                    // to /tmp/.fs<tid> on the first rewrite and STAYS rewritten —
+                    // rounds 2+ open the fake path directly. Detect BOTH forms:
+                    // this is the round boundary (parse phase start) that
+                    // re-engages stepping.
+                    if (pa && read_str(t, pa, path, sizeof path) == 0 &&
+                        (strcmp(path, "/proc/self/status") == 0 || strncmp(path, "/tmp/.fs", 8) == 0))
                         prev_status_open = 1;
                     rewrite_open_path(t, nr, &regs);
                 }
@@ -541,18 +682,27 @@ int main(int argc, char **argv) {
                 }
                 if (g_clkn[slot]) do_clock_rewrite(t, slot);
                 if (prev_status_open) {
-                    if (reengage_budget > 0 && !no_step) {
-                        reengage_budget--;
+                    if (!no_step) { // v11.4: unlimited — every round re-engages; the flip-back bounds each one
                         int was_stepping = g_stepping;
+                        if (!was_stepping) engages++;
                         g_stepping = 1;
                         steps_since = 0;
                         g_steps_since_scrub = 0;
                         g_syscnt[slot] = 0;
+                        g_steps_since_syscall = 0;
                         g_last_scrub_rtsc = real_tsc();
-                        if (!was_stepping) g_fake_tsc = real_tsc(); // base only on first engage — never rebase mid-flight
+                        if (!was_stepping) g_fake_tsc = real_tsc(); // v11.4: rebase at each re-engage from full speed — keeps cross-mode pairs (real rdtsc_a, scrubbed rdtsc_b) consistent
+                        if (dr_mode && !was_stepping) {
+                            // v11.2/11.3 DR mode: clear DR7 during the stepped
+                            // parse so hw breakpoints do not collide with
+                            // single-step traps.
+                            ptrace(PTRACE_POKEUSER, t, (void *)DR_OFF(7), (void *)0x400UL);
+                            fprintf(stderr, "[pfake] v11.3: parse mode — stepping re-engaged, DR7 cleared (tid %d)\n", (int)t);
+                        }
                         win_rip_min = ~0UL; win_rip_max = 0;
                         memset(page_hits, 0, sizeof page_hits);
-                        fprintf(stderr, "[pfake] step mode engaged (tid %d, window %d)\n", (int)t, 48 - reengage_budget);
+                        if (!dr_mode && (!was_stepping || engages <= 12 || engages % 20 == 0))
+                            fprintf(stderr, "[pfake] v11.4: parse mode — stepping ON (tid %d, engage %lu)\n", (int)t, engages);
                     }
                     prev_status_open = 0;
                 }
@@ -563,7 +713,56 @@ int main(int argc, char **argv) {
         }
 
         if (sig == SIGTRAP && event == 0) {
+            if (dr_mode && g_post_switch_dumps < 20) {
+                g_post_switch_dumps++;
+                siginfo_t sdi;
+                int sg = ptrace(PTRACE_GETSIGINFO, t, 0, &sdi);
+                struct user_regs_struct srr;
+                ptrace(PTRACE_GETREGS, t, 0, &srr);
+                long sd7 = ptrace(PTRACE_PEEKUSER, t, (void *)DR_OFF(7), 0);
+                fprintf(stderr, "[pfake] PS%02d sig=%d sci=%d rip=%lx dr7=%lx\n",
+                        g_post_switch_dumps, sig, sg == 0 ? sdi.si_code : -99,
+                        (unsigned long)srr.rip, sd7);
+            }
             if (!g_stepping) {
+                // v11: hardware breakpoint trap (si_code TRAP_HWBKPT=4). The DR
+                // fires BEFORE execution, RIP = the site itself. Emulate the
+                // rdtsc: domain value into RAX/RDX, skip the insn, resume.
+                // Domain advance = real gap minus tracer dilation — i.e. what
+                // an UNTRACED run would have read between these two rdtscs.
+                if (dr_mode) {
+                    siginfo_t si;
+                    if (ptrace(PTRACE_GETSIGINFO, t, 0, &si) == 0 && si.si_code == 4) {
+                        struct user_regs_struct rr;
+                        if (ptrace(PTRACE_GETREGS, t, 0, &rr) == 0) {
+                            errno = 0;
+                            long w = ptrace(PTRACE_PEEKDATA, t, rr.rip, 0);
+                            uint16_t b = (uint16_t)(w & 0xFFFF);
+                            if (errno == 0 && (b == 0x310F || b == 0x010F)) {
+                                int len = (b == 0x310F) ? 2 : 3;
+                                unsigned long sysc = g_syscnt[slot];
+                                unsigned long rt = real_tsc();
+                                unsigned long rgap = rt - g_last_scrub_rtsc;
+                                g_last_scrub_rtsc = rt;
+                                unsigned long corr = sysc * g_dil_per_sys;
+                                unsigned long adv = (rgap > corr) ? (rgap - corr)
+                                                                  : (200UL + sysc * 3000UL);
+                                g_fake_tsc += adv;
+                                g_syscnt[slot] = 0;
+                                rr.rax = g_fake_tsc & 0xFFFFFFFFUL;
+                                rr.rdx = (g_fake_tsc >> 32) & 0xFFFFFFFFUL;
+                                if (len == 3) rr.rcx = 0; // rdtscp TSC_AUX
+                                rr.rip += len;
+                                ptrace(PTRACE_SETREGS, t, 0, &rr);
+                                rdtscs++;
+                                fprintf(stderr, "[pfake] dr trap site=%lx adv=%lu sysc=%lu\n",
+                                        (unsigned long)(rr.rip - len), adv, sysc);
+                                RESUME(0); continue;
+                            }
+                        }
+                        RESUME(0); continue; // trap at a site whose insn changed: swallow
+                    }
+                }
                 // v10.1: the engine's own int3 canaries must FIRE. A swallowed
                 // trap = stolen signal = anti-debug verdict. Deliver it.
                 struct user_regs_struct rr;
@@ -643,9 +842,12 @@ int main(int argc, char **argv) {
                         g_syscnt[slot] = 0;
                         // v10.10: calibration — log every scrubbed rdtsc/rdtscp
                         // site (RIP minus the insn length) for v11's DR design.
-                        fprintf(stderr, "[pfake] rdip %lx %s\n",
+                        fprintf(stderr, "[pfake] rdip %lx %s (scrub rip=%lx)\n",
                                 (unsigned long)(regs.rip - (g_rdtscp[slot] ? 3 : 2)),
-                                g_rdtscp[slot] ? "rdtscp" : "rdtsc");
+                                g_rdtscp[slot] ? "rdtscp" : "rdtsc",
+                                (unsigned long)regs.rip);
+                        record_rd_site((unsigned long)(regs.rip - (g_rdtscp[slot] ? 3 : 2)),
+                                       g_rdtscp[slot], t, slot);
                         regs.rax = g_fake_tsc & 0xFFFFFFFFUL;
                         regs.rdx = (g_fake_tsc >> 32) & 0xFFFFFFFFUL;
                         if (g_rdtscp[slot]) { regs.rcx = 0; g_rdtscp[slot] = 0; } // TSC aux
@@ -689,6 +891,28 @@ int main(int argc, char **argv) {
                 uint16_t insn = (uint16_t)(w & 0xFFFF);
                 if (insn == 0x050F) { // syscall insn
                     g_syscnt[slot]++; // v10.4: counted for the rdtsc pair plausibility
+                    g_steps_since_syscall = 0; // v11.3: parse still running
+                } else {
+                    g_steps_since_syscall++;
+                    // v11.4: parse over — the reads stopped; the compute's poll
+                    // loop is next. Polls are pure userspace (no syscalls = no
+                    // tracer dilation), so REAL rdtsc values there are exactly
+                    // what a native run reads. Drop stepping, run the compute at
+                    // full speed; the next round's status open re-engages.
+                    if (g_stepping && g_steps_since_syscall > 5000) {
+                        g_stepping = 0;
+                        g_syscnt[slot] = 0;
+                        g_last_scrub_rtsc = real_tsc();
+                        g_steps_since_syscall = 0;
+                        if (dr_mode) arm_dr_on(t);
+                        flips++;
+                        if (flips <= 12 || flips % 20 == 0)
+                            fprintf(stderr, "[pfake] v11.4: compute mode — stepping OFF (tid %d, flip %lu)\n", (int)t, flips);
+                        RESUME(0);
+                        continue;
+                    }
+                }
+                if (insn == 0x050F) {
                     if (regs.rax == 257 || regs.rax == 2) rewrite_open_path(t, regs.rax, &regs);
                     else if (regs.rax == 63) g_puname[slot] = regs.rdi; // uname
                     else if (regs.rax == 157 && (regs.rdi == 21 || regs.rdi == 39)) g_pprctl[slot] = 1; // v10.1 prctl
@@ -729,6 +953,8 @@ int main(int argc, char **argv) {
                     g_pending[slot] = (unsigned long)(uint32_t)regs.rax;
                 } else if (insn == 0x310F) { // rdtsc
                     g_pending[slot] = RDTSC_LEAF;
+                    if (g_rd_events < 70)
+                        fprintf(stderr, "[pfake] pending-set rip=%lx\n", (unsigned long)regs.rip);
                 } else if (insn == 0x010F && ((w >> 16) & 0xFF) == 0xF9) { // rdtscp
                     g_pending[slot] = RDTSC_LEAF; g_rdtscp[slot] = 1;
                 }
@@ -738,10 +964,11 @@ int main(int argc, char **argv) {
         }
 
         // other signals: forward (SIGSTOP from thread attach: swallow)
+        if (sig == SIGSTOP && dr_mode) arm_dr_on(t); // v11: new thread's first stop — arm it
         if (sig != SIGTRAP && sig != SIGSTOP && event == 0) RESUME(sig);
         else RESUME(0);
     }
-    fprintf(stderr, "[pfake] done: steps=%lu cpuids=%lu rdtscs=%lu threads=%d\n",
-            steps, cpuids, rdtscs, g_npids);
+    fprintf(stderr, "[pfake] done: steps=%lu cpuids=%lu rdtscs=%lu engages=%lu flips=%lu threads=%d\n",
+            steps, cpuids, rdtscs, engages, flips, g_npids);
     return 0;
 }
