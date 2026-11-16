@@ -891,18 +891,23 @@ int main(int argc, char **argv) {
                 uint16_t insn = (uint16_t)(w & 0xFFFF);
                 if (insn == 0x050F) { // syscall insn
                     g_syscnt[slot]++; // v10.4: counted for the rdtsc pair plausibility
-                    g_steps_since_syscall = 0; // v11.3: parse still running
-                    // v11.4: a LONG nanosleep (>=1ms) = the wait phase. The
-                    // parse is over (its reads are 1-byte, its yields are 0ns);
-                    // the engine is now polling rdtsc around kernel sleeps.
-                    // Sleeps are timed BY THE KERNEL — no tracer dilation — so
-                    // full speed + real rdtsc is exactly the native semantics.
+                    // v11.6: only READ-family syscalls mark "parse running" —
+                    // the parse is open/read/close bursts. The compute phase's
+                    // short poll-sleeps must NOT reset the flip counter, else
+                    // the 500K-insn compute never reaches the 5K backstop.
+                    if (regs.rax == 0 || regs.rax == 257 || regs.rax == 2 || regs.rax == 3)
+                        g_steps_since_syscall = 0;
+                    // v11.6: ANY nanosleep >=100us = past the parse. The parse
+                    // is pure reads with no sleeps; the compute's poll loop
+                    // sleeps ~100us-1ms between rdtsc reads. Kernel-timed
+                    // sleep = no tracer dilation -> full speed + real rdtsc
+                    // is exactly native semantics.
                     if (g_stepping && (regs.rax == 35 || regs.rax == 230)) {
                         long w0 = ptrace(PTRACE_PEEKDATA, t, regs.rdi, 0);
                         long w1 = ptrace(PTRACE_PEEKDATA, t, regs.rdi + 8, 0);
                         if (w0 != -1 && w1 != -1) {
                             unsigned long sec = (unsigned long)w0, nsec = (unsigned long)w1;
-                            if (sec > 0 || nsec >= 1000000UL) {
+                            if (sec > 0 || nsec >= 100000UL) {
                                 g_stepping = 0;
                                 g_syscnt[slot] = 0;
                                 g_last_scrub_rtsc = real_tsc();
