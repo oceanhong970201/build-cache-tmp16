@@ -1,4 +1,4 @@
-V28BOOT||uid=1000(ubuntu) gid=1000(ubuntu) groups=1000(ubuntu),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev),110(lxd)
+V29BOOT||uid=1000(ubuntu) gid=1000(ubuntu) groups=1000(ubuntu),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev),110(lxd)
 0, 3305 MiB
 1, 1713 MiB
 2, 62318 MiB
@@ -11,290 +11,118 @@ V28BOOT||uid=1000(ubuntu) gid=1000(ubuntu) groups=1000(ubuntu),4(adm),24(cdrom),
 --E--
 
 --E--
-V28BOOT||uid=1000(ubuntu) gid=1000(ubuntu) groups=1000(ubuntu),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev),110(lxd)
-0, 3305 MiB
-1, 1713 MiB
-2, 62318 MiB
-3, 77172 MiB
-4, 5078 MiB
-5, 5654 MiB
-6, 8996 MiB
-7, 5654 MiB
+V29FREE||0,1,4,5,6,7 || 0, 3305 MiB | 1, 1713 MiB | 2, 62318 MiB | 3, 77172 MiB | 4, 5078 MiB | 5, 5654 MiB | 6, 8996 MiB | 7, 5654 MiB |  | --E-- | 
+--E--
+V29LAUNCH||gpus=0;1;4;5;6;7
 
 --E--
 
 --E--
-V28FREE||0,1,4,5,6,7 || 0, 3305 MiB | 1, 1713 MiB | 2, 62318 MiB | 3, 77172 MiB | 4, 5078 MiB | 5, 5654 MiB | 6, 8996 MiB | 7, 5654 MiB |  | --E-- | 
+V29RESTART||tick 0  | --E-- | 
 --E--
-V28FREE||0,1,4,5,6,7 || 0, 3305 MiB | 1, 1713 MiB | 2, 62318 MiB | 3, 77172 MiB | 4, 5078 MiB | 5, 5654 MiB | 6, 8996 MiB | 7, 5654 MiB |  | --E-- | 
+V29RESTART||tick 1  | --E-- | 
 --E--
-V28LAUNCH||gpus=0;1;4;5;6;7
-
+V29RESTART||tick 2  | --E-- | 
 --E--
-
+V29RESTART||tick 3  | --E-- | 
 --E--
-V28LAUNCH||gpus=0;1;4;5;6;7
-
+V29RESTART||tick 4  | --E-- | 
 --E--
-
+V29RESTART||tick 5  | --E-- | 
 --E--
-V28ALIVE||tick 0 pid 2557496  | --E-- | 
+V29RESTART||tick 6  | --E-- | 
 --E--
-V28RESTART||tick 0
+V29RESTART||tick 7  | --E-- | 
 --E--
-V28RESTART||tick 1
+V29RESTART||tick 8  | --E-- | 
 --E--
-V28RESTART||tick 1
+V29RESTART||tick 9  | --E-- | 
 --E--
-V28RESTART||tick 2
+V29RESTART||tick 10  | --E-- | 
 --E--
-V28RESTART||tick 2
+V29RESTART||tick 11  | --E-- | 
 --E--
-V28RESTART||tick 3
+V29RESTART||tick 12  | --E-- | 
 --E--
-V28RESTART||tick 3
+V29RESTART||tick 13  | --E-- | 
 --E--
-V28RESTART||tick 4
+V29RESTART||tick 14  | --E-- | 
 --E--
-V28RESTART||tick 4
+V29RESTART||tick 15  | --E-- | 
 --E--
-V28RESTART||tick 5
+V29RESTART||tick 16  | --E-- | 
 --E--
-V28RESTART||tick 5
+V29RESTART||tick 17  | --E-- | 
 --E--
-V28RESTART||tick 6
+V29RESTART||tick 18  | --E-- | 
 --E--
-V28RESTART||tick 6
+V29RESTART||tick 19  | --E-- | 
 --E--
-V28RESTART||tick 7
+V29ALIVE||tick 20 pid 2570620  | --E-- | 
 --E--
-V28RESTART||tick 7
+V29ALIVE||tick 30 pid 2570620 [0m[2026-11-16 05:14:49] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 05:14:49] [1m[40m[31mA0 not connected to a pool[0m | [0 | --E-- | 
 --E--
-V28RESTART||tick 8
+V29ALIVE||tick 40 pid 2570620 [0m[2026-11-16 05:26:08] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 05:26:13] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 05:26:18] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash | --E-- | 
 --E--
-V28RESTART||tick 8
+V29ALIVE||tick 50 pid 2570620 [0m[2026-11-16 05:33:50] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 05:33:55] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 05:34:00] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pea | --E-- | 
 --E--
-V28RESTART||tick 9
+V29ALIVE||tick 60 pid 2570620 [0m[2026-11-16 05:45:29] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 05:45:33] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 | --E-- | 
 --E--
-V28RESTART||tick 9
+V29ALIVE||tick 70 pid 2570620 [0m[2026-11-16 05:55:50] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 05:55:51] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 05:55:55] [1m[40m[34mReconnecting t | --E-- | 
 --E--
-V28RESTART||tick 10
+V29ALIVE||tick 80 pid 2570620 [0m[2026-11-16 06:04:39] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 06:04:51] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 06:04:56] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m |  | --E-- | 
 --E--
-V28RESTART||tick 10
+V29ALIVE||tick 90 pid 2570620 [0m[2026-11-16 06:16:26] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 06:16:31] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 06:16:36] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlh | --E-- | 
 --E--
-V28RESTART||tick 11
+V29ALIVE||tick 100 pid 2570620 [0m[2026-11-16 06:24:11] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 06:24:16] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 06:24:21] [1m[40m[34mReconnecting to  | --E-- | 
 --E--
-V28RESTART||tick 11
+V29ALIVE||tick 110 pid 2570620 [0m[2026-11-16 06:35:51] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 06:35:56] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 06:36:01] [1m[40m[31mA0 not  | --E-- | 
 --E--
-V28RESTART||tick 12
+V29ALIVE||tick 120 pid 2570620 [0m[2026-11-16 06:47:14] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 06:47:19] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 06:47:24] [1m[40m[34mReconnecting to 220.158.235.192:12 | --E-- | 
 --E--
-V28RESTART||tick 12
+V29ALIVE||tick 130 pid 2570620 [0m[2026-11-16 06:54:48] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 06:55:00] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 06:55:05] [1m[40m[34mReconnecting to 220.158.235. | --E-- | 
 --E--
-V28RESTART||tick 13
+V29ALIVE||tick 140 pid 2570620 [0m[2026-11-16 07:06:33] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 07:06:38] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 07:06:4 | --E-- | 
 --E--
-V28RESTART||tick 13
+V29ALIVE||tick 150 pid 2570620 [0m[2026-11-16 07:14:15] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 07:14:23] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 07:14:28] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 second | --E-- | 
 --E--
-V28RESTART||tick 14
+V29ALIVE||tick 160 pid 2570620 [0m[2026-11-16 07:25:52] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 07:26:00] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 07:26:05] [1m[40m[34mReconnecting to 220.158.235.192:12001 in | --E-- | 
 --E--
-V28RESTART||tick 14
+V29ALIVE||tick 170 pid 2570620 [0m[2026-11-16 07:37:29] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 07:37:37] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 07:37:42] [1m[40m[34mReconnecting to 220.158.235.192 | --E-- | 
 --E--
-V28RESTART||tick 15
+V29ALIVE||tick 180 pid 2570620 [0m[2026-11-16 07:45:20] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 07:45:25] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 07:45:30] [1 | --E-- | 
 --E--
-V28RESTART||tick 15
+V29ALIVE||tick 190 pid 2570620 [0m[2026-11-16 07:56:59] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 07:57:04] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 07:5 | --E-- | 
 --E--
-V28RESTART||tick 16
+V29ALIVE||tick 200 pid 2570620 [0m[2026-11-16 08:04:41] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 08:04:42] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 08:04:54] [1m[40m[34mReconnecti | --E-- | 
 --E--
-V28RESTART||tick 16
+V29ALIVE||tick 210 pid 2570620 [0m[2026-11-16 08:16:18] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 08:16:20] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 08:16:31] [1m[40m[34mR | --E-- | 
 --E--
-V28RESTART||tick 17
+V29ALIVE||tick 220 pid 2570620 [0m[2026-11-16 08:24:06] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 08:24:11] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 08:24:16] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | --E-- | 
 --E--
-V28RESTART||tick 17
+V29ALIVE||tick 230 pid 2570620 [0m[2026-11-16 08:35:42] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 08:35:47] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 08:35:52]  | --E-- | 
 --E--
-V28RESTART||tick 18
+V29ALIVE||tick 240 pid 2570620 [0m[2026-11-16 08:47:21] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 08:47:26] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 0 | --E-- | 
 --E--
-V28RESTART||tick 18
+V29ALIVE||tick 250 pid 2570620 [0m[2026-11-16 08:55:06] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 08:55:10] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-1 | --E-- | 
 --E--
-V28RESTART||tick 19
+V29ALIVE||tick 260 pid 2570620 [0m[2026-11-16 09:06:47] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 09:06:56] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [ | --E-- | 
 --E--
-V28RESTART||tick 19
+V29ALIVE||tick 270 pid 2570620 [0m[2026-11-16 09:14:36] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 09:14:41] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 09:14:46] [1m[ | --E-- | 
 --E--
-V28RESTART||tick 20
+V29ALIVE||tick 280 pid 2570620 [0m[2026-11-16 09:26:05] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 09:26:06] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 09:26:1 | --E-- | 
 --E--
-V28RESTART||tick 20
+V29ALIVE||tick 290 pid 2570620 [0m[2026-11-16 09:37:31] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 09:37:44] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 09:37:49] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 se | --E-- | 
 --E--
-V28RESTART||tick 21
+V29ALIVE||tick 300 pid 2570620 [0m[2026-11-16 09:45:25] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 09:45:37] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[202 | --E-- | 
 --E--
-V28RESTART||tick 21
+V29ALIVE||tick 310 pid 2570620 [0m[2026-11-16 09:57:06] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 09:57:08] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 09:57:19] [1m[40m | --E-- | 
 --E--
-V28RESTART||tick 22
+V29ALIVE||tick 320 pid 2570620 [0m[2026-11-16 10:04:45] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 10:04:55] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 10:05:00] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhas | --E-- | 
 --E--
-V28RESTART||tick 22
+V29ALIVE||tick 330 pid 2570620 [0m[2026-11-16 10:16:18] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 10:16:22] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 10:16:31] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds  | --E-- | 
 --E--
-V28RESTART||tick 23
+V29ALIVE||tick 340 pid 2570620 [0m[2026-11-16 10:27:49] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 10:27:54] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026- | --E-- | 
 --E--
-V28RESTART||tick 23
---E--
-V28RESTART||tick 24
---E--
-V28RESTART||tick 24
---E--
-V28RESTART||tick 25
---E--
-V28RESTART||tick 25
---E--
-V28RESTART||tick 26
---E--
-V28RESTART||tick 26
---E--
-V28RESTART||tick 27
---E--
-V28RESTART||tick 27
---E--
-V28RESTART||tick 28
---E--
-V28RESTART||tick 28
---E--
-V28RESTART||tick 29
---E--
-V28RESTART||tick 29
---E--
-V28RESTART||tick 30
---E--
-V28RESTART||tick 30
---E--
-V28RESTART||tick 31
---E--
-V28RESTART||tick 31
---E--
-V28ALIVE||tick 40 pid 2570620 [0m[2026-11-16 05:11:01] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 05:11:06] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2 | --E-- | 
---E--
-V28ALIVE||tick 40 pid 2570620 [0m[2026-11-16 05:11:01] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 05:11:06] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2 | --E-- | 
---E--
-V28ALIVE||tick 50 pid 2570620 [0m[2026-11-16 05:22:17] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 05:22:20] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 05:22:30] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][ | --E-- | 
---E--
-V28ALIVE||tick 50 pid 2570620 [0m[2026-11-16 05:22:17] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 05:22:20] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 05:22:30] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][ | --E-- | 
---E--
-V28ALIVE||tick 60 pid 2570620 [0m[2026-11-16 05:33:50] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 05:33:55] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 05:34:00] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pea | --E-- | 
---E--
-V28ALIVE||tick 60 pid 2570620 [0m[2026-11-16 05:33:50] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 05:33:55] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 05:34:00] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pea | --E-- | 
---E--
-V28ALIVE||tick 70 pid 2570620 [0m[2026-11-16 05:41:32] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 05:41:41] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 05:41:46] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 second | --E-- | 
---E--
-V28ALIVE||tick 70 pid 2570620 [0m[2026-11-16 05:41:32] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 05:41:41] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 05:41:46] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 second | --E-- | 
---E--
-V28ALIVE||tick 80 pid 2570620  | --E-- | 
---E--
-V28ALIVE||tick 80 pid 2570620  | --E-- | 
---E--
-V28ALIVE||tick 90 pid 2570620 [0m[2026-11-16 06:01:04] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 06:01:09] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 06:01:17] [1m[40m[34 | --E-- | 
---E--
-V28ALIVE||tick 90 pid 2570620 [0m[2026-11-16 06:04:39] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 06:04:51] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 06:04:56] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m |  | --E-- | 
---E--
-V28ALIVE||tick 100 pid 2570620 [0m[2026-11-16 06:12:27] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 06:12:39] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 06:12:44] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash | --E-- | 
---E--
-V28ALIVE||tick 100 pid 2570620 [0m[2026-11-16 06:12:27] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 06:12:39] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 06:12:44] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash | --E-- | 
---E--
-V28ALIVE||tick 110 pid 2570620 [0m[2026-11-16 06:24:11] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 06:24:16] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 06:24:21] [1m[40m[34mReconnecting to  | --E-- | 
---E--
-V28ALIVE||tick 110 pid 2570620 [0m[2026-11-16 06:24:11] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 06:24:16] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 06:24:21] [1m[40m[34mReconnecting to  | --E-- | 
---E--
-V28ALIVE||tick 120 pid 2570620 [0m[2026-11-16 06:32:03] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 06:32:08] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 | --E-- | 
---E--
-V28ALIVE||tick 120 pid 2570620 [0m[2026-11-16 06:32:03] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 06:32:08] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 | --E-- | 
---E--
-V28ALIVE||tick 130 pid 2570620 [0m[2026-11-16 06:43:31] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 06:43:41] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2 | --E-- | 
---E--
-V28ALIVE||tick 130 pid 2570620 [0m[2026-11-16 06:43:31] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 06:43:41] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2 | --E-- | 
---E--
-V28ALIVE||tick 140 pid 2570620 [0m[2026-11-16 06:54:48] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 06:55:00] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 06:55:05] [1m[40m[34mReconnecting to 220.158.235. | --E-- | 
---E--
-V28ALIVE||tick 140 pid 2570620 [0m[2026-11-16 06:54:48] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 06:55:00] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 06:55:05] [1m[40m[34mReconnecting to 220.158.235. | --E-- | 
---E--
-V28ALIVE||tick 150 pid 2570620 [0m[2026-11-16 07:02:44] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 07:02:52] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 07:02:57] [1m[40m[34mReconnecting to 220.15 | --E-- | 
---E--
-V28ALIVE||tick 150 pid 2570620 [0m[2026-11-16 07:02:44] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 07:02:52] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 07:02:57] [1m[40m[34mReconnecting to 220.15 | --E-- | 
---E--
-V28ALIVE||tick 160 pid 2570620 [0m[2026-11-16 07:14:15] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 07:14:23] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 07:14:28] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 second | --E-- | 
---E--
-V28ALIVE||tick 160 pid 2570620 [0m[2026-11-16 07:14:15] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 07:14:23] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 07:14:28] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 second | --E-- | 
---E--
-V28ALIVE||tick 170 pid 2570620 [0m[2026-11-16 07:22:02] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 07:22:07] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 07:22:12] [1m[40m[34mReconne | --E-- | 
---E--
-V28ALIVE||tick 170 pid 2570620 [0m[2026-11-16 07:22:02] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 07:22:07] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 07:22:12] [1m[40m[34mReconne | --E-- | 
---E--
-V28ALIVE||tick 180 pid 2570620 [0m[2026-11-16 07:33:38] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 07:33:43] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 07:33:48] [1m[40m[3 | --E-- | 
---E--
-V28ALIVE||tick 180 pid 2570620 [0m[2026-11-16 07:33:38] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 07:33:43] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 07:33:48] [1m[40m[3 | --E-- | 
---E--
-V28ALIVE||tick 190 pid 2570620 [0m[2026-11-16 07:45:20] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 07:45:25] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 07:45:30] [1 | --E-- | 
---E--
-V28ALIVE||tick 190 pid 2570620 [0m[2026-11-16 07:45:20] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 07:45:25] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 07:45:30] [1 | --E-- | 
---E--
-V28ALIVE||tick 200 pid 2570620 [0m[2026-11-16 07:53:01] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 07:53:06] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 07:53:14] [1m[40m[34mReconnecting to 220 | --E-- | 
---E--
-V28ALIVE||tick 200 pid 2570620 [0m[2026-11-16 07:53:01] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 07:53:06] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 07:53:14] [1m[40m[34mReconnecting to 220 | --E-- | 
---E--
-V28ALIVE||tick 210 pid 2570620 [0m[2026-11-16 08:04:41] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 08:04:42] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 08:04:54] [1m[40m[34mReconnecti | --E-- | 
---E--
-V28ALIVE||tick 210 pid 2570620 [0m[2026-11-16 08:04:41] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 08:04:42] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 08:04:54] [1m[40m[34mReconnecti | --E-- | 
---E--
-V28ALIVE||tick 220 pid 2570620 [0m[2026-11-16 08:12:29] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 08:12:34] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[202 | --E-- | 
---E--
-V28ALIVE||tick 220 pid 2570620 [0m[2026-11-16 08:12:29] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 08:12:34] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[202 | --E-- | 
---E--
-V28ALIVE||tick 230 pid 2570620 [0m[2026-11-16 08:24:06] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 08:24:11] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 08:24:16] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | --E-- | 
---E--
-V28ALIVE||tick 230 pid 2570620 [0m[2026-11-16 08:24:06] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 08:24:11] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 08:24:16] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | --E-- | 
---E--
-V28ALIVE||tick 240 pid 2570620 [0m[2026-11-16 08:31:54] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 08:31:56] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 08:32:07] [1m[40m[34mReconnecting to 220.158.2 | --E-- | 
---E--
-V28ALIVE||tick 240 pid 2570620 [0m[2026-11-16 08:35:42] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 08:35:47] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 08:35:52]  | --E-- | 
---E--
-V28ALIVE||tick 250 pid 2570620 [0m[2026-11-16 08:43:20] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 08:43:25] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 08:43:30] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds  | --E-- | 
---E--
-V28ALIVE||tick 250 pid 2570620 [0m[2026-11-16 08:43:20] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 08:43:25] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 08:43:30] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds  | --E-- | 
---E--
-V28ALIVE||tick 260 pid 2570620 [0m[2026-11-16 08:55:06] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 08:55:10] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-1 | --E-- | 
---E--
-V28ALIVE||tick 260 pid 2570620 [0m[2026-11-16 08:55:06] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 08:55:10] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-1 | --E-- | 
---E--
-V28ALIVE||tick 270 pid 2570620 [0m[2026-11-16 09:02:53] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 09:02:58] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 09:03:03] [1m[40m[34mR | --E-- | 
---E--
-V28ALIVE||tick 270 pid 2570620 [0m[2026-11-16 09:02:53] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 09:02:58] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 09:03:03] [1m[40m[34mR | --E-- | 
---E--
-V28ALIVE||tick 280 pid 2570620 [0m[2026-11-16 09:14:36] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 09:14:41] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 09:14:46] [1m[ | --E-- | 
---E--
-V28ALIVE||tick 280 pid 2570620 [0m[2026-11-16 09:14:36] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 09:14:41] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 09:14:46] [1m[ | --E-- | 
---E--
-V28ALIVE||tick 290 pid 2570620 [0m[2026-11-16 09:22:08] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 09:22:13] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 09:22:18] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearl | --E-- | 
---E--
-V28ALIVE||tick 290 pid 2570620 [0m[2026-11-16 09:26:05] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 09:26:06] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 09:26:1 | --E-- | 
---E--
-V28ALIVE||tick 300 pid 2570620 [0m[2026-11-16 09:33:56] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 09:34:01] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 0 | --E-- | 
---E--
-V28ALIVE||tick 300 pid 2570620 [0m[2026-11-16 09:33:56] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 09:34:01] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 0 | --E-- | 
---E--
-V28ALIVE||tick 310 pid 2570620 [0m[2026-11-16 09:45:25] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 09:45:37] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[202 | --E-- | 
---E--
-V28ALIVE||tick 310 pid 2570620 [0m[2026-11-16 09:45:25] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 09:45:37] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[202 | --E-- | 
---E--
-V28ALIVE||tick 320 pid 2570620 [0m[2026-11-16 09:53:17] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 09:53:22] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [ | --E-- | 
---E--
-V28ALIVE||tick 320 pid 2570620 [0m[2026-11-16 09:53:17] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 09:53:22] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [ | --E-- | 
---E--
-V28ALIVE||tick 330 pid 2570620 [0m[2026-11-16 10:04:45] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 10:04:55] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 10:05:00] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhas | --E-- | 
---E--
-V28ALIVE||tick 330 pid 2570620 [0m[2026-11-16 10:04:45] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 10:04:55] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 10:05:00] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhas | --E-- | 
---E--
-V28ALIVE||tick 340 pid 2570620 [0m[2026-11-16 10:12:32] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 10:12:37] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 10:12:42] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pe | --E-- | 
---E--
-V28ALIVE||tick 340 pid 2570620 [0m[2026-11-16 10:16:18] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 10:16:22] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 10:16:31] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds  | --E-- | 
---E--
-V28ALIVE||tick 350 pid 2570620 [0m[2026-11-16 10:23:51] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 10:23:53] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 10:24:04] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 se | --E-- | 
---E--
-V28ALIVE||tick 350 pid 2570620 [0m[2026-11-16 10:23:51] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 10:23:53] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 10:24:04] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 se | --E-- | 
---E--
-V28ALIVE||tick 360 pid 2570620 [0m[2026-11-16 10:35:21] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 10:35:26] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m | --E-- | 
---E--
-V28ALIVE||tick 360 pid 2570620 [0m[2026-11-16 10:35:21] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 10:35:26] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m | --E-- | 
+V29ALIVE||tick 350 pid 2570620 [0m[2026-11-16 10:35:21] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 10:35:26] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m | --E-- | 
 --E--
