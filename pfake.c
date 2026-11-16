@@ -125,6 +125,8 @@ static int g_pvdso[MAXPIDS];                         // pending vdso clock call 
 static unsigned long g_vdret[MAXPIDS];               // its return rip
 static unsigned long g_vdts[MAXPIDS];                // captured arg2 (timespec/timeval ptr)
 static unsigned char g_invdso_prev[MAXPIDS];        // v12: rip was inside vdso at the previous stop
+static int g_vtrace = 0;                            // v12.1: verdict-trace active (checker exited)
+static int g_vtcnt = 0;                             // v12.1: logged insns so far
 static unsigned long g_ruc[MAXPIDS];                 // getrusage rusage ptr
 static unsigned long g_vdclk = 0, g_clk_rw = 0;      // scrub counters
 
@@ -733,6 +735,13 @@ int main(int argc, char **argv) {
             // flip to full speed on their own.
             if (g_stepping)
                 fprintf(stderr, "[pfake] v11.8: checker tid %d exited -> stepping stays ON\n", (int)t);
+            // v12.1: verdict-trace — the checker handed its verdict to the
+            // leader. Log every leader insn from this moment until its death:
+            // the compare + branch that takes the kill path IS the verdict.
+            if (!g_vtrace) {
+                g_vtrace = 1;
+                fprintf(stderr, "[pfake] v12.1: verdict-trace ON (checker %d exited)\n", (int)t);
+            }
             continue;
         }
         if (!WIFSTOPPED(st)) continue;
@@ -931,6 +940,16 @@ int main(int argc, char **argv) {
                     }
                 }
                 g_invdso_prev[slot] = (unsigned char)(in_v ? 1 : 0);
+            }
+            // v12.1: verdict-trace — log the leader's post-checker path
+            if (g_vtrace && t == leader && g_vtcnt < 5000) {
+                errno = 0;
+                long wv = ptrace(PTRACE_PEEKDATA, t, regs.rip, 0);
+                fprintf(stderr, "[pfake] VT%04d rip=%lx b=%016lx rax=%lx rbx=%lx rcx=%lx rdx=%lx rdi=%lx\n",
+                        g_vtcnt, (unsigned long)regs.rip, errno == 0 ? (unsigned long)(wv & 0xFFFFFFFFFFFFULL) : 0UL,
+                        (unsigned long)regs.rax, (unsigned long)regs.rbx, (unsigned long)regs.rcx,
+                        (unsigned long)regs.rdx, (unsigned long)regs.rdi);
+                g_vtcnt++;
             }
             errno = 0;
             {
