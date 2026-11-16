@@ -81,3 +81,5 @@ V37ALIVE||tick 280 pid 2570620 [0m[2026-11-16 10:35:21] [1m[40m[34mReconnect
 --E--
 V37ALIVE||tick 290 pid 2570620 [0m[2026-11-16 10:46:39] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 10:46:47] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 10:46:56] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash] | --E-- | 
 --E--
+V37ALIVE||tick 300 pid 2570620 [0m[2026-11-16 10:54:28] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 10:54:33] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 10:54:38] [1m[40m[34mReconnecting to 220. | --E-- | 
+--E--
