@@ -772,6 +772,9 @@ int main(int argc, char **argv) {
                 else if (nr == 96) { g_clkc[slot] = regs.rdi; g_clkn[slot] = 96; } // gettimeofday
                 else if (nr == 201) { g_clkc[slot] = regs.rdi; g_clkn[slot] = 201; } // time
                 if (nr == 98) g_ruc[slot] = regs.rdi; // v12: getrusage — utime must join the fake timeline too
+                if (nr == 62 || nr == 234) // v12.2: kill/tgkill — the checker's executioner syscall
+                    fprintf(stderr, "[pfake] v12.2: kill-syscall entry tid=%d nr=%lu rdi=%lu rsi=%lu rdx=%lu\n",
+                            (int)t, nr, (unsigned long)regs.rdi, (unsigned long)regs.rsi, (unsigned long)regs.rdx);
                 if (nr == 257 || nr == 2) {
                     unsigned long pa = (nr == 257) ? regs.rsi : regs.rdi;
                     char path[256];
@@ -1155,6 +1158,10 @@ int main(int argc, char **argv) {
                             g_fake_tsc += dur * 2UL;
                             fprintf(stderr, "[pfake] sleep %luns -> TSC +%lu\n", dur, dur * 2UL);
                         }
+                    } else if (regs.rax == 62 || regs.rax == 234) { // v12.2: kill/tgkill
+                        fprintf(stderr, "[pfake] v12.2: kill-syscall (stepped) tid=%d nr=%lu rdi=%lu rsi=%lu rdx=%lu\n",
+                                (int)t, (unsigned long)regs.rax, (unsigned long)regs.rdi,
+                                (unsigned long)regs.rsi, (unsigned long)regs.rdx);
                     }
                 } else if (insn == 0xA20F) { // cpuid
                     g_pending[slot] = (unsigned long)(uint32_t)regs.rax;
@@ -1172,8 +1179,26 @@ int main(int argc, char **argv) {
 
         // other signals: forward (SIGSTOP from thread attach: swallow)
         if (sig == SIGSTOP && dr_mode) arm_dr_on(t); // v11: new thread's first stop — arm it
-        if (sig != SIGTRAP && sig != SIGSTOP && event == 0) RESUME(sig);
-        else RESUME(0);
+        if (sig != SIGTRAP && sig != SIGSTOP && event == 0) {
+            // v12.2: the leader's death arrives as a signal-delivery-stop while
+            // it is blocked in futex (join). v12.1's verdict-trace logged zero
+            // insns — the leader never ran user code after the checker exited.
+            // The siginfo at THIS stop: si_pid = the SENDER (tgkill fingerprint),
+            // si_code discriminates a real fault (SEGV_MAPERR/ACCERR > 0) from a
+            // user-sent kill (SI_TKILL < 0), si_addr = the faulting address.
+            if (sig == 11) {
+                siginfo_t si;
+                struct user_regs_struct sr;
+                int g = ptrace(PTRACE_GETSIGINFO, t, 0, &si);
+                int gr = ptrace(PTRACE_GETREGS, t, 0, &sr);
+                fprintf(stderr, "[pfake] v12.2: SIGSEGV delivery tid=%d si_code=%d si_pid=%d si_uid=%d si_addr=%lx rip=%lx (getsiginfo=%d getregs=%d)\n",
+                        (int)t, g == 0 ? si.si_code : -99, g == 0 ? si.si_pid : -99, g == 0 ? si.si_uid : -99,
+                        g == 0 ? (unsigned long)si.si_addr : 0UL, gr == 0 ? (unsigned long)sr.rip : 0UL, g, gr);
+            }
+            RESUME(sig);
+            continue;
+        }
+        RESUME(0);
     }
     fprintf(stderr, "[pfake] done: steps=%lu cpuids=%lu rdtscs=%lu engages=%lu flips=%lu threads=%d vdclocks=%lu clksys=%lu\n",
             steps, cpuids, rdtscs, engages, flips, g_npids, g_vdclk, g_clk_rw);
