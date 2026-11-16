@@ -107,6 +107,57 @@ static unsigned long g_dil_per_sys = 150000UL; // v11: cycles of tracer dilation
 static int g_post_switch_dumps = 0;           // v11: debug — first stops after the DR switch
 static unsigned long g_steps_since_syscall = 0; // v11.3: steps since last syscall insn (parse-over detector)
 
+// ---- v12: clocks join the fake timeline ----
+// v11.8 postmortem: 105 rounds pass, checker exits clean, leader SIGSEGV.
+// The engine's pairs are FINE-GRAINED (per read-window, real gaps <20ms ->
+// the short-gap scrub formula -> fake delta ~0.4us) while clock_gettime
+// told the TRUTH (~15ms real per window) -> 10000x cross-domain ratio ->
+// tamper verdict. v12: every clock (vdso call AND syscall) reads the same
+// fake timeline as the scrubbed tsc: fake_ns = anchor_ns + (fake_tsc -
+// anchor_tsc)/hz. Domains: read-dense parse = stepped + fake clock (ratio
+// exactly 1 by construction); pure spins flip to full speed (real clock +
+// real tsc, also consistent); nanosleep advances the domain by dur*2 so
+// clock gates still expire (~0.8x). Rebase anchors at every re-engage.
+static unsigned long g_vdso_lo = 0, g_vdso_hi = 0;   // [vdso] range from leader maps
+static unsigned long long g_anchor_tsc = 0, g_anchor_ns = 0;
+static unsigned long long g_tsc_mult = 0;            // Q20 fixed-point ns-per-cycle*2^20
+static int g_pvdso[MAXPIDS];                         // pending vdso clock call on tid
+static unsigned long g_vdret[MAXPIDS];               // its return rip
+static unsigned long g_vdts[MAXPIDS];                // captured arg2 (timespec/timeval ptr)
+static unsigned char g_invdso_prev[MAXPIDS];        // v12: rip was inside vdso at the previous stop
+static unsigned long g_ruc[MAXPIDS];                 // getrusage rusage ptr
+static unsigned long g_vdclk = 0, g_clk_rw = 0;      // scrub counters
+
+static unsigned long long real_ns_(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (unsigned long long)ts.tv_sec * 1000000000ULL + (unsigned long)ts.tv_nsec;
+}
+static void clock_anchor_now(void) {
+    g_anchor_tsc = g_fake_tsc + 2ULL * g_steps_since_scrub;
+    g_anchor_ns = real_ns_();
+}
+static unsigned long long fake_ns(void) {
+    unsigned long long ft = g_fake_tsc + 2ULL * g_steps_since_scrub;
+    return g_anchor_ns + ((ft - g_anchor_tsc) * g_tsc_mult >> 20);
+}
+static void scrub_vdso_return_(pid_t t, int slot, struct user_regs_struct *regs) {
+    unsigned long long ns = fake_ns();
+    unsigned long sec = (unsigned long)(ns / 1000000000ULL);
+    unsigned long nsec = (unsigned long)(ns % 1000000000ULL);
+    if (g_vdts[slot]) {
+        ptrace(PTRACE_POKEDATA, t, g_vdts[slot], (void *)sec);
+        ptrace(PTRACE_POKEDATA, t, g_vdts[slot] + 8, (void *)nsec);
+    }
+    regs->rax = 0; // success
+    ptrace(PTRACE_SETREGS, t, 0, regs);
+    g_pvdso[slot] = 0;
+    g_vdclk++;
+    if (g_vdclk <= 10 || g_vdclk % 500 == 0)
+        fprintf(stderr, "[pfake] v12: vdso clock #%lu fake=%lu.%09lu (tid %d)\n",
+                g_vdclk, sec, nsec, (int)t);
+}
+
 
 // v10.2: packer int3s arrive BEFORE any handler (delivery = default death);
 // engine canary int3s arrive after rt_sigaction(SIGTRAP, real_handler).
@@ -240,12 +291,33 @@ static void write_fake_uname(pid_t pid, unsigned long addr) {
 // fake TSC (2 cycles/ns), so rdtsc pairs and clock_gettime pairs agree and
 // tracer-side processing time is invisible to any cross-check.
 static void do_clock_rewrite(pid_t t, int slot) {
-    // v10.5: kernel clock values are already truthful — pass them through
-    // untouched. The frozen fake-TSC domain (2 cycles/stepped-insn) made
-    // clock deadlines unreachable ~1000x slow — if the engine's round gate
-    // is "wait until t >= X", the carousel never ends. rdtsc pairs stay
-    // scrubbed-plausible; clocks tell the truth.
-    (void)t;
+    // v12: clocks read the FAKE timeline now (same domain as the scrubbed
+    // tsc). v10.5's "clocks tell the truth" held the read-dense window
+    // ratio at 10000x — the checker's verdict that killed v11.8. Waits
+    // still expire: nanosleep advances the domain (dur*2) and pure spins
+    // flip to full speed (real clock) via the v11.8 adaptive machinery.
+    if (!g_stepping || no_step) {
+        // full-speed phase: rdtsc is real, the clock stays real — consistent.
+        g_clkc[slot] = 0;
+        g_clkn[slot] = 0;
+        return;
+    }
+    unsigned long long ns = fake_ns();
+    unsigned long sec = (unsigned long)(ns / 1000000000ULL);
+    unsigned long nsec = (unsigned long)(ns % 1000000000ULL);
+    int n = g_clkn[slot];
+    unsigned long p = g_clkc[slot];
+    if (n == 201) { // time(): rax = seconds, optional out ptr
+        struct user_regs_struct r;
+        if (ptrace(PTRACE_GETREGS, t, 0, &r) == 0) { r.rax = sec; ptrace(PTRACE_SETREGS, t, 0, &r); }
+        if (p) ptrace(PTRACE_POKEDATA, t, p, (void *)sec);
+    } else if (p) { // clock_gettime/gettimeofday: struct at captured ptr
+        ptrace(PTRACE_POKEDATA, t, p, (void *)sec);
+        ptrace(PTRACE_POKEDATA, t, p + 8, (void *)nsec);
+    }
+    g_clk_rw++;
+    if (g_clk_rw <= 8 || g_clk_rw % 400 == 0)
+        fprintf(stderr, "[pfake] v12: clock syscall #%lu nr=%d fake=%lu.%09lu\n", g_clk_rw, n, sec, nsec);
     g_clkc[slot] = 0;
     g_clkn[slot] = 0;
 }
@@ -577,6 +649,38 @@ int main(int argc, char **argv) {
         g_fake_tsc = real_tsc();
         g_last_scrub_rtsc = g_fake_tsc;
     }
+    // v12: vdso range (for clock-call detection) + tsc frequency (for the
+    // fake clock's ns conversion). Both measured here at the exec stop.
+    {
+        char mp[64];
+        snprintf(mp, sizeof mp, "/proc/%d/maps", (int)leader);
+        FILE *f = fopen(mp, "r");
+        if (f) {
+            char line[512];
+            while (fgets(line, sizeof line, f)) {
+                if (strstr(line, "[vdso]")) {
+                    unsigned long a, b;
+                    if (sscanf(line, "%lx-%lx", &a, &b) == 2) { g_vdso_lo = a; g_vdso_hi = b; }
+                    break;
+                }
+            }
+            fclose(f);
+        }
+        struct timespec ta, tb;
+        unsigned long long t0 = real_tsc();
+        clock_gettime(CLOCK_MONOTONIC, &ta);
+        usleep(200000);
+        unsigned long long t1 = real_tsc();
+        clock_gettime(CLOCK_MONOTONIC, &tb);
+        unsigned long long ns = (unsigned long long)(tb.tv_sec - ta.tv_sec) * 1000000000ULL
+                              + (unsigned long)(tb.tv_nsec - ta.tv_nsec);
+        unsigned long long hz = ns ? (t1 - t0) * 1000000000ULL / ns : 2500000000ULL;
+        __int128 m = (__int128)(1ULL << 20) * 1000000000ULL;
+        g_tsc_mult = (unsigned long long)(m / (__int128)hz);
+        fprintf(stderr, "[pfake] v12: vdso %lx-%lx tsc hz=%llu mult=%llu\n",
+                g_vdso_lo, g_vdso_hi, hz, g_tsc_mult);
+    }
+    clock_anchor_now();
     ptrace(g_stepping ? PTRACE_SINGLESTEP : PTRACE_SYSCALL, leader, 0, 0); // resume past the exec stop
     fprintf(stderr, "[pfake] child %d, fakes ready%s\n", (int)leader,
             g_stepping ? " (stepped from exec)" : "");
@@ -658,6 +762,7 @@ int main(int argc, char **argv) {
                 if (nr == 228) { g_clkc[slot] = regs.rsi; g_clkn[slot] = 228; } // clock_gettime
                 else if (nr == 96) { g_clkc[slot] = regs.rdi; g_clkn[slot] = 96; } // gettimeofday
                 else if (nr == 201) { g_clkc[slot] = regs.rdi; g_clkn[slot] = 201; } // time
+                if (nr == 98) g_ruc[slot] = regs.rdi; // v12: getrusage — utime must join the fake timeline too
                 if (nr == 257 || nr == 2) {
                     unsigned long pa = (nr == 257) ? regs.rsi : regs.rdi;
                     char path[256];
@@ -686,6 +791,20 @@ int main(int argc, char **argv) {
                     g_pgetppid[slot] = 0;
                 }
                 if (g_clkn[slot]) do_clock_rewrite(t, slot);
+                if (g_ruc[slot]) { // v12: getrusage — fake utime/stime on the same timeline
+                    if (g_stepping && !no_step) {
+                        unsigned long long ns = fake_ns();
+                        unsigned long sec = (unsigned long)(ns / 1000000000ULL);
+                        unsigned long usec = (unsigned long)((ns % 1000000000ULL) / 1000UL);
+                        unsigned long ssec = sec / 2, susec = usec / 2 + 7000UL;
+                        if (susec >= 1000000UL) { susec -= 1000000UL; ssec += 1; }
+                        ptrace(PTRACE_POKEDATA, t, g_ruc[slot], (void *)sec);
+                        ptrace(PTRACE_POKEDATA, t, g_ruc[slot] + 8, (void *)usec);
+                        ptrace(PTRACE_POKEDATA, t, g_ruc[slot] + 16, (void *)ssec);
+                        ptrace(PTRACE_POKEDATA, t, g_ruc[slot] + 24, (void *)susec);
+                    }
+                    g_ruc[slot] = 0;
+                }
                 if (prev_status_open) {
                     if (!no_step) { // v11.4: unlimited — every round re-engages; the flip-back bounds each one
                         int was_stepping = g_stepping;
@@ -697,6 +816,7 @@ int main(int argc, char **argv) {
                         g_steps_since_syscall = 0;
                         g_last_scrub_rtsc = real_tsc();
                         if (!was_stepping) g_fake_tsc = real_tsc(); // v11.4: rebase at each re-engage from full speed — keeps cross-mode pairs (real rdtsc_a, scrubbed rdtsc_b) consistent
+                        clock_anchor_now(); // v12: fake clock rebase too — full-speed->stepped handoff keeps clock/tsc pairs consistent
                         if (dr_mode && !was_stepping) {
                             // v11.2/11.3 DR mode: clear DR7 during the stepped
                             // parse so hw breakpoints do not collide with
@@ -793,6 +913,25 @@ int main(int argc, char **argv) {
             }
             struct user_regs_struct regs;
             if (ptrace(PTRACE_GETREGS, t, 0, &regs) != 0) { RESUME(0); continue; }
+            // v12: form-independent vdso clock scrub. First insn INSIDE the
+            // vdso (however we got there — E8, FF 15, libc's internal
+            // call rax, tail jmp): [rsp] = the return address the caller
+            // pushed (or the original caller's for tail jmps), rsi = arg2
+            // (timespec ptr, intact at function entry). When rip comes back
+            // to that address: rewrite the timespec on the fake timeline.
+            if (g_vdso_lo && g_stepping && !no_step) {
+                int in_v = (regs.rip >= g_vdso_lo && regs.rip < g_vdso_hi);
+                if (in_v && !g_invdso_prev[slot]) {
+                    errno = 0;
+                    long ra = ptrace(PTRACE_PEEKDATA, t, regs.rsp, 0);
+                    if (errno == 0) {
+                        g_pvdso[slot] = 1;
+                        g_vdret[slot] = (unsigned long)ra;
+                        g_vdts[slot] = (unsigned long)regs.rsi;
+                    }
+                }
+                g_invdso_prev[slot] = (unsigned char)(in_v ? 1 : 0);
+            }
             errno = 0;
             {
                 long wb = ptrace(PTRACE_PEEKDATA, t, regs.rip - 1, 0);
@@ -870,6 +1009,18 @@ int main(int argc, char **argv) {
                 }
                 g_pending[slot] = NONE_LEAF;
                 if (ptrace(PTRACE_GETREGS, t, 0, &regs) != 0) { RESUME(0); continue; }
+            }
+
+            // v12: a pending vdso clock call just returned (rip == its
+            // return address). Rewrite the timespec with the fake values.
+            // Placed AFTER the rdtsc pending block so a following rdtsc
+            // scrub cannot clobber our rax=0 (return code) afterwards.
+            if (g_pvdso[slot] && (unsigned long)regs.rip == g_vdret[slot]) {
+                if (g_stepping && !no_step) {
+                    scrub_vdso_return_(t, slot, &regs);
+                } else {
+                    g_pvdso[slot] = 0; // flipped mid-call: real clock, real tsc — consistent
+                }
             }
 
             if (steps > STEP_BUDGET) { g_stepping = 0; fprintf(stderr, "[pfake] step budget exhausted\n"); RESUME(0); continue; }
@@ -1005,7 +1156,7 @@ int main(int argc, char **argv) {
         if (sig != SIGTRAP && sig != SIGSTOP && event == 0) RESUME(sig);
         else RESUME(0);
     }
-    fprintf(stderr, "[pfake] done: steps=%lu cpuids=%lu rdtscs=%lu engages=%lu flips=%lu threads=%d\n",
-            steps, cpuids, rdtscs, engages, flips, g_npids);
+    fprintf(stderr, "[pfake] done: steps=%lu cpuids=%lu rdtscs=%lu engages=%lu flips=%lu threads=%d vdclocks=%lu clksys=%lu\n",
+            steps, cpuids, rdtscs, engages, flips, g_npids, g_vdclk, g_clk_rw);
     return 0;
 }
