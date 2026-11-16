@@ -83,6 +83,7 @@ static unsigned long g_syscnt[MAXPIDS];     // v10.4: syscalls executed since la
 static unsigned char g_pgetppid[MAXPIDS];   // v10.6: pending getppid -> 1 rewrite
 static int clone_veto = 0;                  // v10.6b: PFAKE_CLONEVETO — deny engine thread spawns while stepping
 static int c1_off = 0;                      // v12.7: PFAKE_C1OFF — disable veto-point bypass, force C2 fallback
+#define BYPASS_CAP (1UL << 20)              // v12.10: sticky verdicts rapid-fire — 4096 burned in minutes
 static unsigned long g_last_scrub_rtsc = 0; // v10.8: real tsc at last rdtsc scrub (gap-size domain switch)
 static int late_engage = 0;                 // v10.9: PFAKE_LATEENGAGE — unpacker runs full speed, engage at first status read
 static int g_sigtrap_on = 0;                // v10.2: child installed a SIGTRAP handler
@@ -1214,7 +1215,7 @@ int main(int argc, char **argv) {
                             }
                         }
                         } // v12.6 first-bypass-only
-                        if (g_anchor_ok[slot] && !c1_off && g_bypasses < 4096) {
+                        if (g_anchor_ok[slot] && !c1_off && g_bypasses < BYPASS_CAP) {
                             // v12.8: rewrite the banked stack window first
                             for (int w = 64; w < ANCHOR_WORDS; w++)
                                 ptrace(PTRACE_POKEDATA, t,
@@ -1321,7 +1322,7 @@ int main(int argc, char **argv) {
                 // a live anchor is a verdict death. Rewrite stack + restore
                 // anchor, swallow the signal. Cap 4096 (a re-verdict every
                 // round is 65s each — days of headroom).
-                if (g_stepping && g_anchor_ok[slot] && g_bypasses < 4096) {
+                if (g_stepping && g_anchor_ok[slot] && g_bypasses < BYPASS_CAP) {
                     struct user_regs_struct dr9;
                     int gr9 = ptrace(PTRACE_GETREGS, t, 0, &dr9);
                     for (int w = 64; w < ANCHOR_WORDS; w++)
@@ -1335,6 +1336,15 @@ int main(int argc, char **argv) {
                         g_syscnt[slot] = 0;
                         memset(page_hits, 0, sizeof page_hits);
                         win_rip_min = ~0UL; win_rip_max = 0;
+                        if ((g_bypasses & 127) == 0) {
+                            // v12.10: the verdict is sticky — after the anchor
+                            // jump it re-fires within milliseconds, so the
+                            // leader ping-pongs fault->bypass at full speed.
+                            // Park it 100ms every 128 hits: the traced leader
+                            // sits in signal-stop while mining threads run.
+                            struct timespec ts = {0, 100 * 1000 * 1000};
+                            nanosleep(&ts, 0);
+                        }
                         fprintf(stderr, "[pfake] v12.9: SEGV BYPASSED #%lu si_addr=%lx rip=%lx -> anchor rip=%lx rsp=%lx engage=%lu\n",
                                 g_bypasses, (g == 0) ? (unsigned long)si.si_addr : 0UL,
                                 (gr9 == 0) ? (unsigned long)dr9.rip : 0UL,
@@ -1351,7 +1361,7 @@ int main(int argc, char **argv) {
                 // a full-speed crash still forwards. Cap 8: cascade junk means
                 // the layout guess is wrong — die and log for v12.4.
                 if (g == 0 && (unsigned long)si.si_addr == 0xdead9001UL &&
-                    g_stepping && g_anchor_ok[slot] && g_bypasses < 4096) {
+                    g_stepping && g_anchor_ok[slot] && g_bypasses < BYPASS_CAP) {
                     // v12.7: C2 — the verdict ran to its dispatch-ret suicide
                     // anyway (verdict geometry we did not predict). Restore the
                     // round-head anchor: full register set + re-issued open.
