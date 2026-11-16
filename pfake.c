@@ -921,6 +921,9 @@ int main(int argc, char **argv) {
                     }
                 } else {
                     g_steps_since_syscall++;
+                    if ((g_steps_since_syscall & 0x3FFFUL) == 0 && g_steps_since_syscall > 0)
+                        fprintf(stderr, "[pfake] dbg since_sys=%lu total=%lu tid=%d\n",
+                                g_steps_since_syscall, g_total_steps, (int)t);
                     // v11.4: parse over — the reads stopped; the compute's poll
                     // loop is next. Polls are pure userspace (no syscalls = no
                     // tracer dilation), so REAL rdtsc values there are exactly
