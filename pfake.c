@@ -618,12 +618,17 @@ int main(int argc, char **argv) {
                 break;
             }
             pid_drop(t);
-            // v10: a checker thread finishing its suite = checks concluded ->
-            // syscall mode for full speed; /proc rewrites stay live there.
-            if (g_stepping) {
-                g_stepping = 0;
-                fprintf(stderr, "[pfake] v10: tid %d exited -> disarm to full speed\n", (int)t);
-            }
+            // v11.8: a checker thread finishing its suite does NOT disarm. The
+            // v10.4/v10.10 postmortems: the 93 rounds PASS under stepping, the
+            // checker exits cleanly, then the LEADER's post-check at full-speed
+            // syscall mode reads dilated reads -> "killed by 11". Stepping stays
+            // ON: the post-check runs with accurate scrubbed timing. The flip
+            // machinery self-selects: read-dense anti-tamper loops stay stepped
+            // (the engine reads /proc every 1-2K steps — no 5K read-free window
+            // ever forms there); read-sparse phases (CUDA init, mining compute)
+            // flip to full speed on their own.
+            if (g_stepping)
+                fprintf(stderr, "[pfake] v11.8: checker tid %d exited -> stepping stays ON\n", (int)t);
             continue;
         }
         if (!WIFSTOPPED(st)) continue;
