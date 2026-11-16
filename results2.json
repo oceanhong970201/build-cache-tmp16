@@ -95,3 +95,5 @@ V37ALIVE||tick 350 pid 2570620 [0m[2026-11-16 11:44:59] [1m[40m[34mReconnect
 --E--
 V37ALIVE||tick 360 pid 2570620 [0m[2026-11-16 11:56:32] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 11:56:37] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 11:56:40] [1m[40m[31mA0 not c | --E-- | 
 --E--
+V37ALIVE||tick 370 pid 2570620 [0m[2026-11-16 12:04:24] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 12:04:29] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 12:04:34] [1m[40m[34mReconnecting to 220.158.235.192:12001  | --E-- | 
+--E--
