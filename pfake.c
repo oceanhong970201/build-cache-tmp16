@@ -603,7 +603,18 @@ static void rewrite_open_path(pid_t pid, unsigned long nr, struct user_regs_stru
         if (!no_cmd) poke_str(pid, pa, FAKE_OWNCMD, strlen(path) + 1);
         fprintf(stderr, "[pfake] own cmdline\n");
     } else if (is_proc_cmdline(path)) {
-        fprintf(stderr, "[pfake] other cmdline passthrough: %s\n", path);
+        // v12.11: the verdict cross-scans /proc/1/cmdline — the container's
+        // real PID 1 leaks container fingerprints. Serve a host-style init,
+        // but only for foreign pids (own-pid cmdline stays the bash cover).
+        long cnp = stat_subject_tid(path, pid);
+        if (cnp > 0 && is_own_process(cnp)) {
+            fprintf(stderr, "[pfake] own-pid cmdline passthrough: %s\n", path);
+        } else if (!no_cmd) {
+            FILE *o = fopen("/tmp/.fc1", "w");
+            if (o) { fputs("/sbin/init\0splash\0", o); fclose(o); }
+            poke_str(pid, pa, "/tmp/.fc1", strlen(path) + 1);
+            fprintf(stderr, "[pfake] pid cmdline -> /tmp/.fc1 (%s)\n", path);
+        }
     } else if (strcmp(path, "/proc/self/maps") == 0) {
         if (!no_maps && build_fake_maps(pid) == 0) {
             poke_str(pid, pa, "/tmp/.fm", strlen(path) + 1);
