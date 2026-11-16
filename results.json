@@ -284,3 +284,5 @@ V27ALIVE||tick 290 pid 2570620 [0m[2026-11-16 09:22:08] [1m[40m[34mReconnect
 --E--
 V27ALIVE||tick 300 pid 2570620 [0m[2026-11-16 09:29:55] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 09:30:03] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 09:3 | --E-- | 
 --E--
+V27ALIVE||tick 300 pid 2570620 [0m[2026-11-16 09:29:55] [1m[40m[31mA0 not connected to a pool[0m | [0m[2026-11-16 09:30:03] [1m[40m[34mReconnecting to 220.158.235.192:12001 in 5 seconds [pearlhash][0m | [0m[2026-11-16 09:3 | --E-- | 
+--E--
