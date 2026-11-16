@@ -595,7 +595,7 @@ int main(int argc, char **argv) {
     if (no_maps) fprintf(stderr, "[pfake] variant: maps passthrough\n");
     if (no_cmd) fprintf(stderr, "[pfake] variant: cmdline passthrough\n");
     if (no_status) fprintf(stderr, "[pfake] variant: status passthrough\n");
-    unsigned long steps = 0, steps_since = 0, cpuids = 0, rdtscs = 0;
+    unsigned long steps = 0, steps_since = 0, cpuids = 0, rdtscs = 0, dbg_prints = 0;
     unsigned long log_cpuid = 0, log_rdtsc = 0, engages = 0, flips = 0;
     int prev_status_open = 0;
 
@@ -921,9 +921,11 @@ int main(int argc, char **argv) {
                     }
                 } else {
                     g_steps_since_syscall++;
-                    if ((g_steps_since_syscall & 0x3FFFUL) == 0 && g_steps_since_syscall > 0)
+                    if ((g_steps_since_syscall % 1000UL) == 0 && dbg_prints < 60) {
+                        dbg_prints++;
                         fprintf(stderr, "[pfake] dbg since_sys=%lu total=%lu tid=%d\n",
                                 g_steps_since_syscall, g_total_steps, (int)t);
+                    }
                     // v11.4: parse over — the reads stopped; the compute's poll
                     // loop is next. Polls are pure userspace (no syscalls = no
                     // tracer dilation), so REAL rdtsc values there are exactly
