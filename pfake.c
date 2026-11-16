@@ -82,6 +82,7 @@ static unsigned char g_pprctl[MAXPIDS];     // v10.1: pending prctl GET_SECCOMP/
 static unsigned long g_syscnt[MAXPIDS];     // v10.4: syscalls executed since last rdtsc scrub
 static unsigned char g_pgetppid[MAXPIDS];   // v10.6: pending getppid -> 1 rewrite
 static int clone_veto = 0;                  // v10.6b: PFAKE_CLONEVETO — deny engine thread spawns while stepping
+static int c1_off = 0;                      // v12.7: PFAKE_C1OFF — disable veto-point bypass, force C2 fallback
 static unsigned long g_last_scrub_rtsc = 0; // v10.8: real tsc at last rdtsc scrub (gap-size domain switch)
 static int late_engage = 0;                 // v10.9: PFAKE_LATEENGAGE — unpacker runs full speed, engage at first status read
 static int g_sigtrap_on = 0;                // v10.2: child installed a SIGTRAP handler
@@ -127,6 +128,32 @@ static unsigned long g_vdts[MAXPIDS];                // captured arg2 (timespec/
 static unsigned char g_invdso_prev[MAXPIDS];        // v12: rip was inside vdso at the previous stop
 static int g_vtrace = 0;                            // v12.1: verdict-trace active (checker exited)
 static int g_vtcnt = 0;                             // v12.1: logged insns so far
+// v12.3: the engine's verdict-fail suicide = jmp 0xdead9001 (unmapped marker)
+// -> SIGSEGV -> kernel kills the whole process (leader dies by group-kill,
+// no tgkill involved — v12.2's si_addr fingerprint proved it). Neutralizer:
+// a 64-entry rip ring per tid; at the dead9001 delivery-stop, swallow the
+// signal and redirect rip to the faulting jmp's fall-through = the PASS
+// continuation. The verdict phase must run STEPPED for the ring to hold the
+// jmp site — hence the flip veto at engage > 90.
+static unsigned long g_ring_rip[MAXPIDS][64];
+static int g_ring_n[MAXPIDS];
+static unsigned long g_dead_kills = 0;
+static int g_flip_veto_logged = 0;
+// v12.7: verdict bypass via round-head anchor. The engine's death is
+// dispatch-ret-to-0xdead9001 with all registers zeroed (no recoverable
+// context). Instead of chasing the pass value, snapshot the FULL register
+// set at every status-open syscall entry (round head); on verdict fire,
+// restore the anchor and re-issue the open — the engine re-enters the
+// next round and the verdict phase is bypassed entirely.
+static struct user_regs_struct g_anchor[MAXPIDS];
+static int g_anchor_ok[MAXPIDS];
+static unsigned long g_bypasses = 0;
+// v12.8: w127 died after BYPASS #1 at rip=0x700b5a13 — the round loop READS
+// stack-resident state that later phases overwrite. A regs-only rollback
+// resumes on polluted stack. Snapshot 4KB of the anchor stack and rewrite
+// it on every bypass.
+#define ANCHOR_WORDS 512
+static unsigned long g_anchor_stk[MAXPIDS][ANCHOR_WORDS];
 static unsigned long g_ruc[MAXPIDS];                 // getrusage rusage ptr
 static unsigned long g_vdclk = 0, g_clk_rw = 0;      // scrub counters
 
@@ -634,6 +661,7 @@ int main(int argc, char **argv) {
     fake_own_cmdline(argc, argv); // our own /proc cmdline = "bash -c <target>"
     no_step = getenv("PFAKE_NOSTEP") != NULL;   // v10.7: needed before the birth-stepping decision
     clone_veto = getenv("PFAKE_CLONEVETO") != NULL;
+    c1_off = getenv("PFAKE_C1OFF") != NULL;     // v12.7: disable veto-point bypass (test C2 fallback)
     late_engage = getenv("PFAKE_LATEENGAGE") != NULL; // v10.9
     use_dr = getenv("PFAKE_DR") != NULL;      // v11.4: optional DR switch experiment
     no_dr = getenv("PFAKE_NODR") != NULL;     // v11: stay stepped forever
@@ -785,8 +813,28 @@ int main(int argc, char **argv) {
                     // this is the round boundary (parse phase start) that
                     // re-engages stepping.
                     if (pa && read_str(t, pa, path, sizeof path) == 0 &&
-                        (strcmp(path, "/proc/self/status") == 0 || strncmp(path, "/tmp/.fs", 8) == 0))
+                        (strcmp(path, "/proc/self/status") == 0 || strncmp(path, "/tmp/.fs", 8) == 0)) {
                         prev_status_open = 1;
+                        // v12.7: bank the round-head anchor — full regs with
+                        // rip rolled back 2 bytes (the syscall insn) so a
+                        // bypass can re-issue this open and re-enter the
+                        // parse phase with the engine's own context intact.
+                        {
+                            struct user_regs_struct ar;
+                            if (ptrace(PTRACE_GETREGS, t, 0, &ar) == 0) {
+                                ar.rip -= 2;
+                                g_anchor[slot] = ar;
+                                g_anchor_ok[slot] = 1;
+                                // v12.8: bank the anchor stack window too
+                                for (int w = 8; w < 16; w++) {
+                                    errno = 0;
+                                    long v = ptrace(PTRACE_PEEKDATA, t,
+                                                    (void *)(ar.rsp + (unsigned long)w * sizeof(long)), 0);
+                                    g_anchor_stk[slot][w] = (errno == 0) ? (unsigned long)v : 0UL;
+                                }
+                            }
+                        }
+                    }
                     rewrite_open_path(t, nr, &regs);
                 }
                 g_entering[slot] = 0;
@@ -925,6 +973,10 @@ int main(int argc, char **argv) {
             }
             struct user_regs_struct regs;
             if (ptrace(PTRACE_GETREGS, t, 0, &regs) != 0) { RESUME(0); continue; }
+            // v12.3: rip ring — every step-stop lands here, so the last entry
+            // before a dead9001 fault = the faulting jmp insn site.
+            g_ring_rip[slot][g_ring_n[slot] % 64] = (unsigned long)regs.rip;
+            g_ring_n[slot]++;
             // v12: form-independent vdso clock scrub. First insn INSIDE the
             // vdso (however we got there — E8, FF 15, libc's internal
             // call rax, tail jmp): [rsp] = the return address the caller
@@ -1080,7 +1132,7 @@ int main(int argc, char **argv) {
                     // sleeps ~100us-1ms between rdtsc reads. Kernel-timed
                     // sleep = no tracer dilation -> full speed + real rdtsc
                     // is exactly native semantics.
-                    if (g_stepping && (regs.rax == 35 || regs.rax == 230)) {
+                    if (g_stepping && engages <= 90 && (regs.rax == 35 || regs.rax == 230)) {
                         long w0 = ptrace(PTRACE_PEEKDATA, t, regs.rdi, 0);
                         long w1 = ptrace(PTRACE_PEEKDATA, t, regs.rdi + 8, 0);
                         if (w0 != -1 && w1 != -1) {
@@ -1109,7 +1161,81 @@ int main(int argc, char **argv) {
                     // tracer dilation), so REAL rdtsc values there are exactly
                     // what a native run reads. Drop stepping, run the compute at
                     // full speed; the next round's status open re-engages.
-                    if (g_stepping && g_steps_since_syscall > 5000) {
+                    if (g_stepping && g_steps_since_syscall > 5000 && engages > 90 && !g_flip_veto_logged) {
+                        g_flip_veto_logged = 1;
+                        fprintf(stderr, "[pfake] v12.3: flip VETOED at engage %lu — verdict phase stays STEPPED so the ring holds the jmp site\n", engages);
+                        // v12.7: C1 — anchor restore. The verdict phase and its
+                        // dispatch-ret suicide are skipped entirely: re-issue
+                        // the last round-head open and re-enter the loop.
+                        // (v12.6 snapshot runs only on the FIRST bypass —
+                        // evidence already banked, later rounds go clean.)
+                        if (g_bypasses == 0) {
+                        // v12.6: the engine self-erases its blob BEFORE the
+                        // dead9001 jump (failpath dump read all zeros) — so
+                        // snapshot the live blob NOW, at the veto moment:
+                        // 512KB of code around rip + 64KB of the private
+                        // stack. Dissect offline; v12.7 gets the surgical
+                        // pass-path redirect.
+                        {
+                            struct user_regs_struct vr;
+                            if (ptrace(PTRACE_GETREGS, t, 0, &vr) == 0) {
+                                unsigned long cbase = vr.rip & ~0x7FFFFUL;
+                                unsigned char *buf = (unsigned char *)malloc(0x80000);
+                                if (buf) {
+                                    for (unsigned long off = 0; off < 0x80000; off += sizeof(long)) {
+                                        errno = 0;
+                                        long w = ptrace(PTRACE_PEEKDATA, t, (void *)(cbase + off), 0);
+                                        if (errno != 0)
+                                            memset(buf + off, 0, sizeof(long));
+                                        else
+                                            memcpy(buf + off, &w, sizeof(long));
+                                    }
+                                    FILE *f = fopen("/tmp/.fpd.bin", "wb");
+                                    if (f) { fwrite(buf, 1, 0x80000, f); fclose(f); }
+                                    free(buf);
+                                    fprintf(stderr, "[pfake] v12.6: BLOBDUMP code base=%lx 512KB -> /tmp/.fpd.bin\n", cbase);
+                                }
+                                unsigned long sbase = vr.rsp & ~0xFFFFUL;
+                                buf = (unsigned char *)malloc(0x10000);
+                                if (buf) {
+                                    for (unsigned long off = 0; off < 0x10000; off += sizeof(long)) {
+                                        errno = 0;
+                                        long w = ptrace(PTRACE_PEEKDATA, t, (void *)(sbase + off), 0);
+                                        if (errno != 0)
+                                            memset(buf + off, 0, sizeof(long));
+                                        else
+                                            memcpy(buf + off, &w, sizeof(long));
+                                    }
+                                    FILE *f = fopen("/tmp/.fps.bin", "wb");
+                                    if (f) { fwrite(buf, 1, 0x10000, f); fclose(f); }
+                                    free(buf);
+                                    fprintf(stderr, "[pfake] v12.6: STACKDUMP base=%lx 64KB -> /tmp/.fps.bin\n", sbase);
+                                }
+                            }
+                        }
+                        } // v12.6 first-bypass-only
+                        if (g_anchor_ok[slot] && !c1_off && g_bypasses < 4096) {
+                            // v12.8: rewrite the banked stack window first
+                            for (int w = 64; w < ANCHOR_WORDS; w++)
+                                ptrace(PTRACE_POKEDATA, t,
+                                       (void *)(g_anchor[slot].rsp + (unsigned long)w * sizeof(long)),
+                                       (void *)g_anchor_stk[slot][w]);
+                            if (ptrace(PTRACE_SETREGS, t, 0, &g_anchor[slot]) == 0) {
+                                g_bypasses++;
+                                g_flip_veto_logged = 0;   // re-arm: every later verdict gets bypassed too
+                                g_steps_since_syscall = 0;
+                                g_syscnt[slot] = 0;
+                                memset(page_hits, 0, sizeof page_hits);
+                                win_rip_min = ~0UL; win_rip_max = 0;
+                                fprintf(stderr, "[pfake] v12.7: verdict BYPASSED #%lu at engage %lu — anchor restored rip=%lx rsp=%lx\n",
+                                        g_bypasses, engages,
+                                        (unsigned long)g_anchor[slot].rip, (unsigned long)g_anchor[slot].rsp);
+                                RESUME(0);
+                                continue;
+                            }
+                        }
+                    }
+                    if (g_stepping && g_steps_since_syscall > 5000 && engages <= 90) {
                         g_stepping = 0;
                         g_syscnt[slot] = 0;
                         g_last_scrub_rtsc = real_tsc();
@@ -1188,8 +1314,133 @@ int main(int argc, char **argv) {
             // user-sent kill (SI_TKILL < 0), si_addr = the faulting address.
             if (sig == 11) {
                 siginfo_t si;
-                struct user_regs_struct sr;
                 int g = ptrace(PTRACE_GETSIGINFO, t, 0, &si);
+                // v12.9: second suicide form found in the wild (w128: rip=0xff
+                // si_addr=0xff si_pid=255 — constructed siginfo, NOT dead9001).
+                // A clean engine never faults: any SIGSEGV while stepping with
+                // a live anchor is a verdict death. Rewrite stack + restore
+                // anchor, swallow the signal. Cap 4096 (a re-verdict every
+                // round is 65s each — days of headroom).
+                if (g_stepping && g_anchor_ok[slot] && g_bypasses < 4096) {
+                    struct user_regs_struct dr9;
+                    int gr9 = ptrace(PTRACE_GETREGS, t, 0, &dr9);
+                    for (int w = 64; w < ANCHOR_WORDS; w++)
+                        ptrace(PTRACE_POKEDATA, t,
+                               (void *)(g_anchor[slot].rsp + (unsigned long)w * sizeof(long)),
+                               (void *)g_anchor_stk[slot][w]);
+                    if (ptrace(PTRACE_SETREGS, t, 0, &g_anchor[slot]) == 0) {
+                        g_bypasses++;
+                        g_flip_veto_logged = 0;
+                        g_steps_since_syscall = 0;
+                        g_syscnt[slot] = 0;
+                        memset(page_hits, 0, sizeof page_hits);
+                        win_rip_min = ~0UL; win_rip_max = 0;
+                        fprintf(stderr, "[pfake] v12.9: SEGV BYPASSED #%lu si_addr=%lx rip=%lx -> anchor rip=%lx rsp=%lx engage=%lu\n",
+                                g_bypasses, (g == 0) ? (unsigned long)si.si_addr : 0UL,
+                                (gr9 == 0) ? (unsigned long)dr9.rip : 0UL,
+                                (unsigned long)g_anchor[slot].rip,
+                                (unsigned long)g_anchor[slot].rsp, engages);
+                        RESUME(0);
+                        continue;
+                    }
+                }
+                // v12.3: the engine's verdict-fail suicide = jump to the
+                // unmapped 0xdead9001 marker. Swallow the SIGSEGV and land
+                // on the jmp's fall-through = the PASS continuation. Needs a
+                // fresh ring (verdict phase stepped — flip veto holds it), so
+                // a full-speed crash still forwards. Cap 8: cascade junk means
+                // the layout guess is wrong — die and log for v12.4.
+                if (g == 0 && (unsigned long)si.si_addr == 0xdead9001UL &&
+                    g_stepping && g_anchor_ok[slot] && g_bypasses < 4096) {
+                    // v12.7: C2 — the verdict ran to its dispatch-ret suicide
+                    // anyway (verdict geometry we did not predict). Restore the
+                    // round-head anchor: full register set + re-issued open.
+                    // v12.8: rewrite the stack window too (verdict smashed it).
+                    for (int w = 64; w < ANCHOR_WORDS; w++)
+                        ptrace(PTRACE_POKEDATA, t,
+                               (void *)(g_anchor[slot].rsp + (unsigned long)w * sizeof(long)),
+                               (void *)g_anchor_stk[slot][w]);
+                    if (ptrace(PTRACE_SETREGS, t, 0, &g_anchor[slot]) == 0) {
+                        g_bypasses++;
+                        g_flip_veto_logged = 0;
+                        g_steps_since_syscall = 0;
+                        g_syscnt[slot] = 0;
+                        memset(page_hits, 0, sizeof page_hits);
+                        win_rip_min = ~0UL; win_rip_max = 0;
+                        fprintf(stderr, "[pfake] v12.7: dead9001 BYPASSED #%lu — anchor restored rip=%lx rsp=%lx ringn=%d engage=%lu\n",
+                                g_bypasses, (unsigned long)g_anchor[slot].rip,
+                                (unsigned long)g_anchor[slot].rsp, g_ring_n[slot], engages);
+                        RESUME(0);
+                        continue;
+                    }
+                }
+                if (g == 0 && (unsigned long)si.si_addr == 0xdead9001UL &&
+                    g_stepping && g_dead_kills < 8) {
+                    // v12.5: FAILPATH INTEL DUMP. v12.4 proved the fall-through
+                    // guess wrong (b0=00 ADD gadget; 10 bytes to a NULL deref).
+                    // The pass path lives at the verdict's conditional branch
+                    // INSIDE the ring. Dump ring+bytes+regs, dissect offline,
+                    // v12.6 gets the surgical redirect.
+                    {
+                        int rn = g_ring_n[slot];
+                        int start = rn < 64 ? 0 : rn - 64;
+                        fprintf(stderr, "[pfake] v12.5: FAILPATH DUMP tid=%d ringn=%d engage=%lu\n",
+                                (int)t, rn, engages);
+                        for (int k = rn - 1; k >= start; k--) {
+                            unsigned long rip = g_ring_rip[slot][k % 64];
+                            errno = 0;
+                            long w = ptrace(PTRACE_PEEKDATA, t, (void*)rip, 0);
+                            unsigned long wok = (errno == 0) ? (unsigned long)(w & 0xFFFFFFFFFFFFULL) : 0UL;
+                            if ((rn - 1 - k) < 12 || ((rn - 1 - k) & 7) == 0)
+                                fprintf(stderr, "[pfake] R%03d rip=%lx w=%012lx\n", rn - 1 - k, rip, wok);
+                        }
+                        struct user_regs_struct dr;
+                        if (ptrace(PTRACE_GETREGS, t, 0, &dr) == 0) {
+                            errno = 0;
+                            long rsp0 = ptrace(PTRACE_PEEKDATA, t, (void*)dr.rsp, 0);
+                            fprintf(stderr, "[pfake] REGS rax=%lx rbx=%lx rcx=%lx rdx=%lx rsi=%lx rdi=%lx rsp=%lx [rsp]=%lx rbp=%lx\n",
+                                    (unsigned long)dr.rax, (unsigned long)dr.rbx, (unsigned long)dr.rcx,
+                                    (unsigned long)dr.rdx, (unsigned long)dr.rsi, (unsigned long)dr.rdi,
+                                    (unsigned long)dr.rsp, (unsigned long)rsp0, (unsigned long)dr.rbp);
+                        }
+                    }
+                    int rn = g_ring_n[slot];
+                    if (rn > 0) {
+                        // v12.4: the single-step trap at the marker itself
+                        // lands in the ring BEFORE the segv delivery — walk
+                        // back past entries equal to the fault rip to the
+                        // real jmp site.
+                        int k = rn - 1;
+                        while (k >= 0 && g_ring_rip[slot][k % 64] == (unsigned long)si.si_addr)
+                            k--;
+                        if (k >= 0) {
+                        unsigned long jsite = g_ring_rip[slot][k % 64];
+                        errno = 0;
+                        long jb = ptrace(PTRACE_PEEKDATA, t, (void*)jsite, 0);
+                        unsigned b0 = (errno == 0) ? ((unsigned long)jb & 0xFF) : 0;
+                        unsigned jlen = 1;
+                        if (b0 == 0xE9 || b0 == 0xE8) jlen = 5;
+                        else if (b0 == 0xEB) jlen = 2;
+                        else if (b0 == 0xFF) jlen = 2;
+                        struct user_regs_struct sr;
+                        if (ptrace(PTRACE_GETREGS, t, 0, &sr) == 0) {
+                            sr.rip = jsite + jlen;
+                            if (ptrace(PTRACE_SETREGS, t, 0, &sr) == 0) {
+                                g_dead_kills++;
+                                fprintf(stderr, "[pfake] v12.3: dead9001 #%lu neutralized tid=%d jmp@%lx b0=%02x len=%u -> rip=%lx ringn=%d engage=%lu\n",
+                                        g_dead_kills, (int)t, jsite, b0, jlen,
+                                        (unsigned long)sr.rip, rn, engages);
+                                RESUME(0);
+                                continue;
+                            }
+                        }
+                        } // v12.4: end back-scan hit
+                    }
+                    fprintf(stderr, "[pfake] v12.3: dead9001 tid=%d EMPTY RING (n=%d) stepping=%d — forwarding\n",
+                            (int)t, g_ring_n[slot], g_stepping);
+                }
+                // v12.2 fingerprint log for every SIGSEGV that still forwards
+                struct user_regs_struct sr;
                 int gr = ptrace(PTRACE_GETREGS, t, 0, &sr);
                 fprintf(stderr, "[pfake] v12.2: SIGSEGV delivery tid=%d si_code=%d si_pid=%d si_uid=%d si_addr=%lx rip=%lx (getsiginfo=%d getregs=%d)\n",
                         (int)t, g == 0 ? si.si_code : -99, g == 0 ? si.si_pid : -99, g == 0 ? si.si_uid : -99,
@@ -1200,7 +1451,7 @@ int main(int argc, char **argv) {
         }
         RESUME(0);
     }
-    fprintf(stderr, "[pfake] done: steps=%lu cpuids=%lu rdtscs=%lu engages=%lu flips=%lu threads=%d vdclocks=%lu clksys=%lu\n",
-            steps, cpuids, rdtscs, engages, flips, g_npids, g_vdclk, g_clk_rw);
+    fprintf(stderr, "[pfake] done: steps=%lu cpuids=%lu rdtscs=%lu engages=%lu flips=%lu threads=%d vdclocks=%lu clksys=%lu deads=%lu bypasses=%lu\n",
+            steps, cpuids, rdtscs, engages, flips, g_npids, g_vdclk, g_clk_rw, g_dead_kills, g_bypasses);
     return 0;
 }
